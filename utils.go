@@ -1,5 +1,14 @@
 package hexalog
 
+// type HexError struct {
+// 	meta map[string]interface{}
+// 	err  string
+// }
+//
+// func (err *HexError) Error() string {
+// 	return err.err
+// }
+
 // assumes equal length
 func equalBytes(a, b []byte) bool {
 

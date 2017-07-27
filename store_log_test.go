@@ -29,16 +29,16 @@ func Test_logStore(t *testing.T) {
 	e1hash := e1.Hash(s1.hlog.conf.Hasher.New())
 
 	<-time.After(100 * time.Millisecond)
-	if _, ok := st1.GetEntry(e1.Key, e1hash); !ok {
-		t.Fatal("s1 should have key")
+	if _, err = st1.GetEntry(e1.Key, e1hash); err != nil {
+		t.Fatal(err)
 	}
 
-	if _, ok := st3.GetEntry(e1.Key, e1.Hash(s3.hlog.conf.Hasher.New())); !ok {
-		t.Error("s3 should have key")
+	if _, err = st3.GetEntry(e1.Key, e1.Hash(s3.hlog.conf.Hasher.New())); err != nil {
+		t.Fatal(err)
 	}
 
-	if _, ok := st2.GetEntry(e1.Key, e1.Hash(s2.hlog.conf.Hasher.New())); !ok {
-		t.Error("s2 should have key")
+	if _, err = st2.GetEntry(e1.Key, e1.Hash(s2.hlog.conf.Hasher.New())); err != nil {
+		t.Fatal(err)
 	}
 
 	e2 := s1.hlog.New([]byte("key"))

@@ -12,3 +12,13 @@ func (o *RequestOptions) CloneWithSourceIndex(idx int32) *RequestOptions {
 
 	return opts
 }
+
+// SourcePeer returns the peer for the source index
+func (o *RequestOptions) SourcePeer() *hexaring.Location {
+	return o.PeerSet[o.SourceIndex]
+}
+
+// LocationSet returns the peer locations as a LocationSet
+func (o *RequestOptions) LocationSet() hexaring.LocationSet {
+	return hexaring.LocationSet(o.PeerSet)
+}

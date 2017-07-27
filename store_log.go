@@ -2,13 +2,15 @@ package hexalog
 
 import (
 	"errors"
+	"log"
 	"sort"
 	"sync"
 	"time"
 )
 
 var (
-	errEntryNotFound = errors.New("entry not found")
+	// ErrEntryNotFound is returned when an entry for a key is not found
+	ErrEntryNotFound = errors.New("entry not found")
 	errKeyNotFound   = errors.New("key not found")
 	errKeyExists     = errors.New("key exists")
 	errKeyInvalid    = errors.New("key invalid")
@@ -19,11 +21,11 @@ type KeylogStore interface {
 	LocationID() []byte
 	Height() uint32
 	Iter(seek []byte, cb func(entry *Entry) error) error
-	GetEntry(id []byte) (*Entry, bool)
-	Entries() []*Entry
+	GetEntry(id []byte) (*Entry, error)
 	LastEntry() *Entry
 	AppendEntry(entry *Entry) error
-	RollbackEntry(entry *Entry) error
+	RollbackEntry(entry *Entry) (int, error)
+	Entries() []*Entry
 }
 
 // InMemLogStore is the whole log containing all keys.  It manages serialization of
@@ -71,7 +73,7 @@ func (hlog *InMemLogStore) sortedKeys() []string {
 }
 
 // GetEntry gets an entry by key and id of the entry
-func (hlog *InMemLogStore) GetEntry(key, id []byte) (*Entry, bool) {
+func (hlog *InMemLogStore) GetEntry(key, id []byte) (*Entry, error) {
 	k := string(key)
 
 	hlog.mu.RLock()
@@ -81,7 +83,7 @@ func (hlog *InMemLogStore) GetEntry(key, id []byte) (*Entry, bool) {
 		return kl.GetEntry(id)
 	}
 
-	return nil, false
+	return nil, ErrEntryNotFound
 }
 
 // LastEntry gets the last entry for a key form the log
@@ -99,12 +101,13 @@ func (hlog *InMemLogStore) LastEntry(key []byte) *Entry {
 
 // NewKey creates a new keylog for a key with the locationID.  It returns an error if the
 // key already exists
-func (hlog *InMemLogStore) NewKey(key, locationID []byte) (err error) {
+func (hlog *InMemLogStore) NewKey(key, locationID []byte) (keylog KeylogStore, err error) {
 	k := string(key)
 
 	hlog.mu.Lock()
 	if _, ok := hlog.m[k]; !ok {
-		hlog.m[k] = NewInMemKeylogStore(key, locationID, hlog.hasher)
+		keylog = NewInMemKeylogStore(key, locationID, hlog.hasher)
+		hlog.m[k] = keylog
 	} else {
 		err = errKeyExists
 	}
@@ -156,19 +159,31 @@ func (hlog *InMemLogStore) RollbackEntry(entry *Entry) error {
 	}
 	hlog.mu.RUnlock()
 
-	return keylog.RollbackEntry(entry)
+	c, err := keylog.RollbackEntry(entry)
+	// If we have no entries in the log after the rollback, remove the Keylog completely
+	if c == 0 {
+		if er := hlog.RemoveKey(entry.Key); er != nil {
+			log.Printf("[ERROR] Logstore failed to remove empty key key=%s error='%v'", entry.Key, er)
+		}
+	}
+
+	// Return rollback error
+	return err
 }
 
 // GetKey returns the log for the given key
 func (hlog *InMemLogStore) GetKey(key []byte) (keylog KeylogStore, err error) {
-	k := string(key)
+	var (
+		k  = string(key)
+		ok bool
+	)
 
-	var ok bool
 	hlog.mu.RLock()
+	defer hlog.mu.RUnlock()
+
 	if keylog, ok = hlog.m[k]; !ok {
 		err = errKeyNotFound
 	}
-	hlog.mu.RUnlock()
 
 	return
 }

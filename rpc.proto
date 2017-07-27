@@ -9,6 +9,7 @@ service HexalogRPC {
     rpc CommitRPC(RPCRequest) returns (RPCResponse) {}
     rpc GetRPC(RPCRequest) returns (RPCResponse) {}
     rpc TransferKeylogRPC(stream RPCRequest) returns (stream RPCRequest) {}
+    rpc FetchKeylogRPC(stream RPCRequest) returns (stream RPCRequest) {}
 }
 
 message Entry {

@@ -20,7 +20,7 @@ func (entry *Entry) Clone() *Entry {
 }
 
 // MarshalJSON is a custom JSON marshaler for Entry
-func (entry *Entry) MarshalJSON() ([]byte, error) {
+func (entry Entry) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
 		"Key":       entry.Key,
 		"Previous":  hex.EncodeToString(entry.Previous),
@@ -73,6 +73,14 @@ func NewFutureEntry(id []byte, entry *Entry) *FutureEntry {
 // the hash of the entry and comparing against this id.
 func (entry *FutureEntry) ID() []byte {
 	return entry.id
+}
+
+// MarshalJSON is a custom marshaller for a FutureEntry
+func (entry FutureEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"ID":    hex.EncodeToString(entry.id),
+		"Entry": *entry.Entry,
+	})
 }
 
 // applied is used to signal the future that the entry has been applied.  It takes data

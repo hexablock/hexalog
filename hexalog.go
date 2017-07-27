@@ -1,13 +1,12 @@
 package hexalog
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
 )
 
@@ -18,20 +17,29 @@ var (
 
 // Transport implements a Hexalog network transport
 type Transport interface {
+	// Gets an entry from a remote host
 	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
+	// Proposes an entry on the remote host
 	ProposeEntry(host string, entry *Entry, opts *RequestOptions) error
+	// Commits an entry on the remote host
 	CommitEntry(host string, entry *Entry, opts *RequestOptions) error
+	// Transfers a key to the remote host
 	TransferKeylog(host string, key []byte) error
+	// Gets all entries for a key starting at entry
+	FetchKeylog(host string, entry *Entry) (*FutureEntry, error)
+	// Registers the log when available
 	Register(hlog *Hexalog)
+	// Shutdown the transport closing outbound connections
+	Shutdown()
 }
 
 // LogStore implements a persistent store for the log
 type LogStore interface {
-	NewKey(key, locationID []byte) error
+	NewKey(key, locationID []byte) (KeylogStore, error)
 	GetKey(key []byte) (KeylogStore, error)
 	RemoveKey(key []byte) error
 	NewEntry(key []byte) *Entry
-	GetEntry(key, id []byte) (*Entry, bool)
+	GetEntry(key, id []byte) (*Entry, error)
 	LastEntry(key []byte) *Entry
 	Iter(func(key string, locationID []byte))
 	AppendEntry(entry *Entry) error
@@ -41,6 +49,7 @@ type LogStore interface {
 // Config holds the configuration for the log.  This is used to initialize the log.
 type Config struct {
 	Hostname           string
+	HealBufSize        int // Buffer size for heal requests
 	BroadcastBufSize   int // proposal and commit broadcast buffer
 	BallotReapInterval time.Duration
 	TTL                time.Duration // ttl for each ballot
@@ -53,7 +62,8 @@ type Config struct {
 func DefaultConfig(hostname string) *Config {
 	return &Config{
 		Hostname:           hostname,
-		BroadcastBufSize:   16,
+		BroadcastBufSize:   32,
+		HealBufSize:        32,
 		BallotReapInterval: 30 * time.Second,
 		TTL:                3 * time.Second,
 		Votes:              3,
@@ -67,7 +77,7 @@ type Hexalog struct {
 	conf *Config
 	// Internal fsm.  This wraps the application FSM from the config
 	fsm *fsm
-
+	// Underlying transport
 	trans Transport
 	// Currently active ballots
 	mu      sync.RWMutex
@@ -75,10 +85,17 @@ type Hexalog struct {
 	// The store containing log entires that are committed, but not necessary applied
 	// to the FSM
 	store LogStore
-	// Propose broadcast channel
+	// Propose broadcast channel to broadcast proposals to the network peer set
 	pch chan *RPCRequest
-	// Commit broadcast channel
+	// Commit broadcast channel to broadcast commits to the network peer set
 	cch chan *RPCRequest
+	// Channel for heal requests.  When previous hash mismatches occur, the log will send a
+	// request down this channel to allow applications to try to recover. This is usually
+	// the case when a keylog falls behind.
+	hch chan *RPCRequest
+
+	shutdown   int32
+	shutdownCh chan struct{}
 }
 
 // NewHexalog initializes a new Hexalog and starts the entry broadcaster
@@ -96,18 +113,28 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 		ballots: make(map[string]*Ballot),
 		pch:     make(chan *RPCRequest, conf.BroadcastBufSize),
 		cch:     make(chan *RPCRequest, conf.BroadcastBufSize),
+		hch:     make(chan *RPCRequest, conf.HealBufSize),
 		store:   logStore,
+		// 3 as we launch 3 go-routines.  We don't deal with the heal queue waiting
+		shutdownCh: make(chan struct{}, 3),
 	}
 
 	// Register Hexalog to the transport to handle RPC requests
 	trans.Register(hlog)
 
 	// Start broadcasting
-	go hlog.startBroadcastPropose()
-	go hlog.startBroadcastCommit()
+	go hlog.broadcastProposals()
+	go hlog.broadcastCommits()
 	go hlog.reapBallots()
 
 	return hlog, nil
+}
+
+// Heal returns a readonly channel containing information on keys that need healing.  This
+// is consumed by the client application to take action when unhealthy keys are found in
+// order to repair them.
+func (hlog *Hexalog) Heal() <-chan *RPCRequest {
+	return hlog.hch
 }
 
 // New returns a new Entry to be appended to the log.
@@ -115,37 +142,10 @@ func (hlog *Hexalog) New(key []byte) *Entry {
 	return hlog.store.NewEntry(key)
 }
 
-func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
-	//
-	// TODO: verify signature
-	//
-
-	// Set the default last id to a zero hash
-	lastID := make([]byte, hlog.conf.Hasher.New().Size())
-	// Try to get the last entry
-	last := hlog.store.LastEntry(entry.Key)
-	if last != nil {
-		prevHeight = last.Height
-		lastID = last.Hash(hlog.conf.Hasher.New())
-	}
-
-	// Check height
-	if entry.Height != prevHeight+1 {
-		err = errPreviousHash
-		return
-	}
-
-	// Check the previous hash
-	if bytes.Compare(entry.Previous, lastID) != 0 {
-		err = errPreviousHash
-	}
-
-	return
-}
-
 // Propose proposes an entry to the log.  It votes on a ballot if it exists or creates one
 // then votes. If required votes has been reach it also moves to the commit phase.
 func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error) {
+
 	//
 	// TODO: Removed ballot on error close
 	//
@@ -157,19 +157,30 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	// Get our location index in the peerset
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
-		return nil, fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+		return nil, fmt.Errorf("%s not in peer set", hlog.conf.Hostname)
 	}
+
 	// Get our location
 	loc := opts.PeerSet[idx]
+	// entry id
+	id := entry.Hash(hlog.conf.Hasher.New())
 
 	// Verify and bootstrap entry
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
+		// Only try to heal if the new height is > then the current one
+		if entry.Height > prevHeight {
+			hlog.hch <- &RPCRequest{
+				ID:      id,    // entry hash id
+				Entry:   entry, // entry itself
+				Options: opts,  // participating peers
+			}
+		}
+
 		return nil, err
 	}
 
 	key := string(entry.Key)
-	id := entry.Hash(hlog.conf.Hasher.New())
 
 	// Get or create ballot as necessary
 	hlog.mu.Lock()
@@ -191,7 +202,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			// Create a new key if height is zero and we don't have it.
 			if prevHeight == 0 {
 				if _, er := hlog.store.GetKey(entry.Key); er != nil {
-					if err = hlog.store.NewKey(entry.Key, loc.ID); err != nil {
+					if _, err = hlog.store.NewKey(entry.Key, loc.ID); err != nil {
 						ballot.close(err)
 						return ballot, err
 					}
@@ -204,30 +215,32 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 	} else {
 		// If the current ballot is closed assume it to be stale and create a new one.
-		if ballot.Closed() {
-			fentry := NewFutureEntry(id, entry)
-			ballot = newBallot(fentry, hlog.conf.Votes, hlog.conf.TTL)
-			hlog.ballots[key] = ballot
-
-		}
+		// if ballot.Closed() {
+		// 	fentry := NewFutureEntry(id, entry)
+		// 	ballot = newBallot(fentry, hlog.conf.Votes, hlog.conf.TTL)
+		// 	hlog.ballots[key] = ballot
+		//
+		// }
 		hlog.mu.Unlock()
 	}
 
-	vid := opts.PeerSet[opts.SourceIndex].Vnode.Id
+	vid := opts.SourcePeer().Vnode.Id
 	pvotes, err := ballot.votePropose(id, string(vid))
+	//if err==errBallotClosed{hlog.removeBallot(entry.Key)}
+
+	log.Printf("[INFO] Propose host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
+
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("[INFO] Propose host=%s index=%d ballot=%p votes=%d voter=%x",
-		hlog.conf.Hostname, opts.SourceIndex, ballot, pvotes, vid)
 
 	if pvotes == 1 {
 
 		// Create a new key if height is 0 and we don't have the key
 		if prevHeight == 0 {
 			if _, er := hlog.store.GetKey(entry.Key); er != nil {
-				if err = hlog.store.NewKey(entry.Key, loc.ID); err != nil {
+				if _, err = hlog.store.NewKey(entry.Key, loc.ID); err != nil {
 					ballot.close(err)
 					return ballot, err
 				}
@@ -272,46 +285,6 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	return ballot, err
 }
 
-func (hlog *Hexalog) reapBallots() {
-	for {
-
-		time.Sleep(hlog.conf.BallotReapInterval)
-
-		// Only reap if we have ballots.  This is because reap actually acquires a write lock
-		// and would yield better performance
-		var reap bool
-		hlog.mu.RLock()
-		if len(hlog.ballots) > 0 {
-			reap = true
-		}
-		hlog.mu.RUnlock()
-
-		if reap {
-			c := hlog.reapBallotsOnce()
-			log.Printf("[DEBUG] Ballots reaped: %d", c)
-		}
-
-	}
-}
-
-// reapBallotsOnce aquires a lock and purges all ballots that have been closed returning
-// the number of ballots purged
-func (hlog *Hexalog) reapBallotsOnce() (c int) {
-
-	hlog.mu.Lock()
-	for k, b := range hlog.ballots {
-		if !b.Closed() {
-			continue
-		}
-
-		delete(hlog.ballots, k)
-		c++
-	}
-	hlog.mu.Unlock()
-
-	return
-}
-
 // Commit tries to commit an already proposed entry to the log.
 func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error) {
 	//
@@ -344,8 +317,9 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	id := entry.Hash(hlog.conf.Hasher.New())
 
 	votes, err := ballot.voteCommit(id, string(vid))
-	log.Printf("[DEBUG] Commit host=%s index=%d ballot=%p votes=%d voter=%x",
-		hlog.conf.Hostname, opts.SourceIndex, ballot, votes, vid)
+
+	log.Printf("[INFO] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
 	// We do not rollback here as we could have a faulty voter trying to commit without
 	// having a proposal.
@@ -366,130 +340,20 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	return ballot, err
 }
 
-func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error {
-	// Get self index in the PeerSet.
-	idx, ok := hlog.getSelfIndex(opts.PeerSet)
-	if !ok {
-		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+// Shutdown signals a shutdown and waits for all go-routines to exit before returning.  It
+// will take atleast the amount of time specified as the ballot reap interval as shutdown
+// for the ballot reaper is checked at the top of the loop
+func (hlog *Hexalog) Shutdown() {
+	atomic.StoreInt32(&hlog.shutdown, 1)
+
+	close(hlog.pch)
+	close(hlog.cch)
+	close(hlog.hch)
+
+	// Wait for echo go-routine to exit their loop
+	for i := 0; i < 3; i++ {
+		<-hlog.shutdownCh
 	}
 
-	for _, p := range opts.PeerSet {
-		// Do not broadcast to self
-		if p.Vnode.Host == hlog.conf.Hostname {
-			continue
-		}
-
-		host := p.Vnode.Host
-
-		o := opts.CloneWithSourceIndex(int32(idx))
-		log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d",
-			hlog.conf.Hostname, host, o.SourceIndex)
-		if err := hlog.trans.ProposeEntry(host, entry, o); err != nil {
-			return err
-		}
-
-	}
-
-	return nil
-}
-
-func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
-	// Get self index in the PeerSet.
-	idx, ok := hlog.getSelfIndex(opts.PeerSet)
-	if !ok {
-		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
-	}
-
-	for _, p := range opts.PeerSet {
-		// Do not broadcast to self
-		if p.Vnode.Host == hlog.conf.Hostname {
-			continue
-		}
-
-		o := opts.CloneWithSourceIndex(int32(idx))
-		log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname,
-			p.Vnode.Host, o.SourceIndex)
-
-		if err := hlog.trans.CommitEntry(p.Vnode.Host, entry, o); err != nil {
-			return err
-		}
-
-	}
-
-	return nil
-}
-
-// getBallot gets a ballot for a key.  It returns nil if a ballot does not exist
-func (hlog *Hexalog) getBallot(key []byte) *Ballot {
-	hlog.mu.RLock()
-	ballot, _ := hlog.ballots[string(key)]
-	hlog.mu.RUnlock()
-	return ballot
-}
-
-func (hlog *Hexalog) removeBallot(key []byte) {
-	k := string(key)
-
-	hlog.mu.Lock()
-	if _, ok := hlog.ballots[k]; ok {
-		delete(hlog.ballots, k)
-	}
-	hlog.mu.Unlock()
-}
-
-func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
-	if opts.PeerSet == nil || len(opts.PeerSet) < hlog.conf.Votes {
-		return errInsufficientPeers
-	}
-
-	return nil
-}
-
-// getSelfIndex gets the index of this node in the PeerSet
-func (hlog *Hexalog) getSelfIndex(peerset []*hexaring.Location) (int, bool) {
-	for i, p := range peerset {
-		if p.Vnode.Host == hlog.conf.Hostname {
-			return i, true
-		}
-	}
-	return -1, false
-}
-
-// startBroadcastCommit starts consuming the commit broadcast channel to broadcast locally
-// committed entries to the network as part of voting.  This is mean to be run in a
-// go-routine.
-func (hlog *Hexalog) startBroadcastCommit() {
-	for msg := range hlog.cch {
-		err := hlog.broadcastCommit(msg.Entry, msg.Options)
-		if err == nil {
-			continue
-		}
-		hlog.ballotGetClose(msg.Entry.Key, err)
-
-		// Rollback the entry.
-		if er := hlog.store.RollbackEntry(msg.Entry); er != nil {
-			log.Println("[ERROR]", er)
-		}
-
-	}
-}
-
-// startBroadcastPropose starts consuming the proposal broadcast channel to broadcast
-// locally proposed entries to the network.  This is mean to be run in a go-routine.
-func (hlog *Hexalog) startBroadcastPropose() {
-	for msg := range hlog.pch {
-
-		if err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
-			// Close ballot with error if we still have the ballot and remove it
-			hlog.ballotGetClose(msg.Entry.Key, err)
-		}
-
-	}
-}
-
-// ballotGetClose gets a ballot and closes it with the given error if not already closed
-func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
-	if ballot := hlog.getBallot(key); ballot != nil {
-		ballot.close(err)
-	}
+	log.Println("[INFO] Hexalog shutdown complete!")
 }

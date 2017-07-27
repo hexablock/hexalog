@@ -1,6 +1,7 @@
 package hexalog
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -64,11 +65,16 @@ func TestBallot_voteCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fut := b1.Future()
+	if bytes.Compare(fut.ID(), testEID) != 0 {
+		t.Error("id's should match")
+	}
+
 	fe2 := NewFutureEntry(testEID, nil)
 	b2 := newBallot(fe2, votes, ttl)
-	if _, err := b2.voteCommit(testEID, "voter"); err != errProposalNotFound {
-		t.Fatal("should fail with", errProposalNotFound.Error())
-	}
+	// if _, err := b2.voteCommit(testEID, "voter"); err != errProposalNotFound {
+	// 	t.Fatal("should fail with", errProposalNotFound.Error())
+	// }
 	for i := 0; i < votes-1; i++ {
 		if _, err := b2.votePropose(testEID, fmt.Sprintf("%d", i)); err != nil {
 			t.Fatal(err)

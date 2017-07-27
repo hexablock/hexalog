@@ -12,6 +12,8 @@ func TestNetTransport(t *testing.T) {
 	s2 := initTestServer("127.0.0.1:43212")
 	s3 := initTestServer("127.0.0.1:43213")
 
+	//s4 := initTestServer("127.0.0.1:43214")
+
 	entry := s2.hlog.New([]byte("testkey"))
 
 	ballot, err := s1.hlog.Propose(entry, testOpts)
@@ -42,7 +44,13 @@ func TestNetTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if _, err = s1.hlog.trans.FetchKeylog("127.0.0.1:43213", entry); err != nil {
+		t.Fatal(err)
+	}
+
 	<-time.After(100 * time.Millisecond)
+
+	//s4.hlog.trans.FetchKeylog("127.0.0.1:43212", entry)
 
 	s1.stop()
 	s2.stop()

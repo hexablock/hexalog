@@ -43,6 +43,7 @@ type testServer struct {
 }
 
 func (server *testServer) stop() {
+	server.hlog.trans.Shutdown()
 	server.s.Stop()
 	server.ln.Close()
 }
@@ -57,12 +58,15 @@ func (ss *MockStableStore) Close() error                   { return nil }
 func initTestServer(addr string) *testServer {
 	ln, _ := net.Listen("tcp", addr)
 	server := grpc.NewServer()
+
 	// Set to low value to allow reaper testing
 	trans := NewNetTransport(500*time.Millisecond, 3*time.Second)
 	RegisterHexalogRPCServer(server, trans)
+
 	ss := &MockStableStore{}
 	ls := NewInMemLogStore(&SHA1Hasher{})
 	hlog, _ := initHexalog(addr, ls, ss, trans)
+
 	go server.Serve(ln)
 
 	return &testServer{ln: ln, hlog: hlog, s: server}
@@ -70,10 +74,28 @@ func initTestServer(addr string) *testServer {
 
 func initHexalog(host string, ls LogStore, ss StableStore, trans Transport) (*Hexalog, error) {
 	conf := DefaultConfig(host)
+	conf.BallotReapInterval = 5 * time.Second
+
 	return NewHexalog(conf, &EchoFSM{}, ls, ss, trans)
 }
 
 func TestMain(m *testing.M) {
 	log.SetLevel("INFO")
 	os.Exit(m.Run())
+}
+
+func TestHexalogShutdown(t *testing.T) {
+	ts1 := initTestServer("127.0.0.1:8997")
+	ts2 := initTestServer("127.0.0.1:9997")
+	ts3 := initTestServer("127.0.0.1:10997")
+	<-time.After(1 * time.Second)
+
+	ts1.hlog.Shutdown()
+	ts2.hlog.Shutdown()
+	ts3.hlog.Shutdown()
+
+	ts1.stop()
+	ts2.stop()
+	ts3.stop()
+
 }

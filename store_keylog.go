@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/hexablock/log"
@@ -75,10 +74,12 @@ func (keylog *InMemKeylogStore) LastEntry() *Entry {
 // hash mismatch
 func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) error {
 
-	lastHash, _ := keylog.lastHashHeight()
+	lastHash, currHeight := keylog.lastHashHeight()
 
 	if bytes.Compare(entry.Previous, lastHash) != 0 {
-		return fmt.Errorf("previous hash mismatch want=%x have=%x", lastHash, entry.Previous)
+		log.Printf("[ERROR] Previous hash mismatch key=%s curr-height=%d new-height=%d want=%x have=%x",
+			entry.Key, currHeight, entry.Height, lastHash, entry.Previous)
+		return errPreviousHash
 	}
 
 	keylog.mu.Lock()
@@ -91,22 +92,22 @@ func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) error {
 }
 
 // GetEntry gets and entry from the InMemKeylogStore
-func (keylog *InMemKeylogStore) GetEntry(id []byte) (*Entry, bool) {
+func (keylog *InMemKeylogStore) GetEntry(id []byte) (*Entry, error) {
 	keylog.mu.RLock()
 	defer keylog.mu.RUnlock()
 
 	for _, v := range keylog.entries {
 		if bytes.Compare(id, v.Hash(keylog.hasher.New())) == 0 {
-			return v, true
+			return v, nil
 		}
 	}
 
-	return nil, false
+	return nil, ErrEntryNotFound
 }
 
 // RollbackEntry rolls the keylog back by the entry.  It only rolls back if the entry is
-// the last entry.
-func (keylog *InMemKeylogStore) RollbackEntry(entry *Entry) error {
+// the last entry.  It returns the number of entries remaining in the log and/or an error
+func (keylog *InMemKeylogStore) RollbackEntry(entry *Entry) (int, error) {
 	hasher := keylog.hasher.New()
 	id := entry.Hash(hasher)
 	// Reset for re-use
@@ -114,20 +115,21 @@ func (keylog *InMemKeylogStore) RollbackEntry(entry *Entry) error {
 
 	last := keylog.LastEntry()
 	if last == nil {
-		return errEntryNotFound
+		// Return 0 entry count
+		return 0, ErrEntryNotFound
 	}
 
 	lid := last.Hash(hasher)
 
 	if bytes.Compare(id, lid) != 0 {
-		return errNotLastEntry
+		return -1, errNotLastEntry
 	}
 
 	keylog.mu.Lock()
 	keylog.entries = keylog.entries[:len(keylog.entries)-1]
 	keylog.mu.Unlock()
 
-	return nil
+	return int(entry.Height) - 1, nil
 }
 
 // Entries returns all log entries in the key log
@@ -141,30 +143,35 @@ func (keylog *InMemKeylogStore) Entries() []*Entry {
 // Iter iterates over entries starting from the seek position.  It iterates over all
 // entries if seek is nil
 func (keylog *InMemKeylogStore) Iter(seek []byte, cb func(entry *Entry) error) error {
+	keylog.mu.RLock()
+	defer keylog.mu.RUnlock()
 
 	s := -1
 	if seek != nil {
 		// Seek to the position
 		h := keylog.hasher.New()
-		keylog.mu.RLock()
+		//keylog.mu.RLock()
 		for i, e := range keylog.entries {
 			h.Reset()
 			id := e.Hash(h)
+
 			if equalBytes(seek, id[:]) {
 				s = i
 				break
 			}
+
 		}
+
 		// Return error if we can't find the seek position
 		if s < 0 {
-			keylog.mu.RUnlock()
+			//keylog.mu.RUnlock()
 			return errNotFound
 		}
 
 	} else {
 		// Iterate all entries if seek is nil
 		s = 0
-		keylog.mu.RLock()
+		//keylog.mu.RLock()
 	}
 
 	// Issue callback based on seek
@@ -176,7 +183,7 @@ func (keylog *InMemKeylogStore) Iter(seek []byte, cb func(entry *Entry) error) e
 		}
 	}
 
-	keylog.mu.RUnlock()
+	//keylog.mu.RUnlock()
 
 	return err
 }

@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	errBallotTimedOut     = errors.New("ballot timed out")
-	errBallotClosed       = errors.New("ballot closed")
-	errBallotNotFound     = errors.New("ballot not found")
-	errProposalNotFound   = errors.New("proposal not found")
+	errBallotTimedOut      = errors.New("ballot timed out")
+	errBallotClosed        = errors.New("ballot closed")
+	errBallotAlreadyClosed = errors.New("ballot already closed")
+	errBallotNotFound      = errors.New("ballot not found")
+	//errProposalNotFound    = errors.New("proposal not found")
 	errNotEnoughProposals = errors.New("not enough proposals")
 	errVoterAlreadyVoted  = errors.New("voter already voted")
 	errInvalidVoteID      = errors.New("invalid vote id")
@@ -44,6 +45,9 @@ type Ballot struct {
 	done chan struct{}
 	// This is set once the ballot has been closed to stop further processing/
 	closed int32
+	// Error the ballot was closed with.  This is the same error that would be in the error
+	// channel
+	e error
 }
 
 func newBallot(fentry *FutureEntry, requiredVotes int, ttl time.Duration) *Ballot {
@@ -68,6 +72,12 @@ func (b *Ballot) Wait() error {
 	}
 
 	return err
+}
+
+// Future returns a FutureEntry associated to the ballot.  It is the entry being voted on
+// and can be used to wait for it to be applied to the FSM.
+func (b *Ballot) Future() *FutureEntry {
+	return b.fentry
 }
 
 // votePropose submit a vote for the propose phase.  It takes an Entry hash id and a voter
@@ -124,12 +134,12 @@ func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
 	}
 
 	// Check if the voter has a proposal
-	b.pmu.RLock()
-	if _, ok := b.proposed[voter]; !ok {
-		b.pmu.RUnlock()
-		return -1, errProposalNotFound
-	}
-	b.pmu.RUnlock()
+	// b.pmu.RLock()
+	// if _, ok := b.proposed[voter]; !ok {
+	// 	b.pmu.RUnlock()
+	// 	return -1, errProposalNotFound
+	// }
+	// b.pmu.RUnlock()
 
 	// Make sure voter hasn't already voted
 	b.cmu.RLock()
@@ -146,6 +156,8 @@ func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
 	b.cmu.Unlock()
 
 	// Check if we have enough commit votes to close the ballot.
+	// QUESTION: do we do any further checks with the no. of proposals and propose and
+	// commit voter to match?
 	if commits == b.votes {
 		b.close(nil)
 	}
@@ -171,11 +183,12 @@ func (b *Ballot) Closed() bool {
 // close the ballot stopping the timer and writing err to the done chan.
 func (b *Ballot) close(err error) error {
 	if b.Closed() {
-		return errBallotClosed
+		return errBallotAlreadyClosed
 	}
 
 	b.timer.Stop()
 	atomic.StoreInt32(&b.closed, 1)
+	b.e = err
 
 	switch err {
 	case nil:
@@ -185,4 +198,9 @@ func (b *Ballot) close(err error) error {
 	}
 	//log.Printf("[DEBUG] Ballot closed: ballot=%p errors=%d completed=%d msg='%v'", b, len(b.err), len(b.done), err)
 	return nil
+}
+
+// Error returns the error the ballot was closed with if any
+func (b *Ballot) Error() error {
+	return b.e
 }
