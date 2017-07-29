@@ -49,7 +49,7 @@ func Test_logStore(t *testing.T) {
 
 	ballot, err = s1.hlog.Propose(e2, testOpts1)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, ballot)
 	}
 	if err = ballot.Wait(); err != nil {
 		t.Fatal(err, ballot)

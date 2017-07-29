@@ -19,9 +19,9 @@ func TestBallot_votePropose(t *testing.T) {
 		}
 	}
 
-	ballot.votePropose(testEID, "voter")
+	//ballot.votePropose(testEID, "voter")
 	if len(ballot.proposed) != 3 {
-		t.Fatal("should have 3 proposals")
+		t.Fatalf("proposal mismatch want=3 have=%d", ballot.Proposals())
 	}
 
 	fe2 := NewFutureEntry(testEID, nil)
@@ -59,6 +59,12 @@ func TestBallot_voteCommit(t *testing.T) {
 		if _, err := b1.voteCommit(testEID, fmt.Sprintf("%d", i)); err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	if b1.Proposals() != b1.Commits() {
+		t.Fatal("proposals != commits")
+	} else {
+		b1.close(nil)
 	}
 
 	if err := b1.Wait(); err != nil {

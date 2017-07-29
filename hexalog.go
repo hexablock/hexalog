@@ -94,7 +94,9 @@ type Hexalog struct {
 	// the case when a keylog falls behind.
 	hch chan *RPCRequest
 
-	shutdown   int32
+	shutdown int32
+	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
+	// queue is not part of this number
 	shutdownCh chan struct{}
 }
 
@@ -107,15 +109,14 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 	}
 
 	hlog := &Hexalog{
-		conf:    conf,
-		fsm:     ifsm,
-		trans:   trans,
-		ballots: make(map[string]*Ballot),
-		pch:     make(chan *RPCRequest, conf.BroadcastBufSize),
-		cch:     make(chan *RPCRequest, conf.BroadcastBufSize),
-		hch:     make(chan *RPCRequest, conf.HealBufSize),
-		store:   logStore,
-		// 3 as we launch 3 go-routines.  We don't deal with the heal queue waiting
+		conf:       conf,
+		fsm:        ifsm,
+		trans:      trans,
+		ballots:    make(map[string]*Ballot),
+		pch:        make(chan *RPCRequest, conf.BroadcastBufSize),
+		cch:        make(chan *RPCRequest, conf.BroadcastBufSize),
+		hch:        make(chan *RPCRequest, conf.HealBufSize),
+		store:      logStore,
 		shutdownCh: make(chan struct{}, 3),
 	}
 
@@ -145,11 +146,7 @@ func (hlog *Hexalog) New(key []byte) *Entry {
 // Propose proposes an entry to the log.  It votes on a ballot if it exists or creates one
 // then votes. If required votes has been reach it also moves to the commit phase.
 func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error) {
-
-	//
-	// TODO: Removed ballot on error close
-	//
-
+	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err
 	}
@@ -160,12 +157,12 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		return nil, fmt.Errorf("%s not in peer set", hlog.conf.Hostname)
 	}
 
-	// Get our location
+	// our location
 	loc := opts.PeerSet[idx]
 	// entry id
 	id := entry.Hash(hlog.conf.Hasher.New())
 
-	// Verify and bootstrap entry
+	// Verify entry
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
 		// Only try to heal if the new height is > then the current one
@@ -177,6 +174,13 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			}
 		}
 
+		//
+		// TODO:
+		// Signal a retry
+		// Do not close ballot
+		//
+
+		hlog.ballotGetClose(entry.Key, err)
 		return nil, err
 	}
 
@@ -214,25 +218,21 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		}
 
 	} else {
-		// If the current ballot is closed assume it to be stale and create a new one.
-		// if ballot.Closed() {
-		// 	fentry := NewFutureEntry(id, entry)
-		// 	ballot = newBallot(fentry, hlog.conf.Votes, hlog.conf.TTL)
-		// 	hlog.ballots[key] = ballot
-		//
-		// }
 		hlog.mu.Unlock()
 	}
 
 	vid := opts.SourcePeer().Vnode.Id
 	pvotes, err := ballot.votePropose(id, string(vid))
-	//if err==errBallotClosed{hlog.removeBallot(entry.Key)}
+	if err == errBallotClosed {
+		// TODO: This is a temporary fix needs to be addressed elsewhere
+		hlog.removeBallot(entry.Key)
+	}
 
 	log.Printf("[INFO] Propose host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
 
 	if err != nil {
-		return nil, err
+		return ballot, err
 	}
 
 	if pvotes == 1 {
@@ -266,16 +266,16 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		var cvotes int
 		cvotes, err = ballot.voteCommit(id, string(opts.PeerSet[idx].Vnode.Id))
 		if err == nil {
-			if cvotes == 1 {
-				// Broadcast commit with new options
-				hlog.cch <- &RPCRequest{Entry: entry, Options: opts}
-			}
+
+			// Take action if we have the required commits
+			hlog.checkCommitAndAct(cvotes, ballot, entry, opts)
 
 		} else {
 
 			// We rollback here as we appended but the vote failed
+			log.Printf("[DEBUG] Rolling back key=%s height=%d id=%x", entry.Key, entry.Height, id)
 			if er := hlog.store.RollbackEntry(entry); er != nil {
-				log.Println("[ERROR] Rollback failed:", er)
+				log.Printf("[ERROR] Rollback failed key=%s height=%d error='%v'", entry.Key, entry.Height, er)
 			}
 
 		}
@@ -287,10 +287,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 // Commit tries to commit an already proposed entry to the log.
 func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error) {
-	//
-	// TODO: Removed ballot on error close
-	//
-
+	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err
 	}
@@ -317,9 +314,13 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	id := entry.Hash(hlog.conf.Hasher.New())
 
 	votes, err := ballot.voteCommit(id, string(vid))
-
 	log.Printf("[INFO] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
+
+	if err == errBallotClosed {
+		// TODO: This is a temporary fix needs to be addressed elsewhere
+		hlog.removeBallot(entry.Key)
+	}
 
 	// We do not rollback here as we could have a faulty voter trying to commit without
 	// having a proposal.
@@ -327,17 +328,9 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 		return ballot, err
 	}
 
-	if votes == 1 {
-		// Broadcast commit entry
-		hlog.cch <- &RPCRequest{Entry: entry, Options: opts}
-	} else if votes == hlog.conf.Votes {
-		// Queue future entry to be applied to the FSM.
-		hlog.fsm.apply(ballot.fentry)
-		// Ballot is closed.  Remove ballot and stop tracking
-		hlog.removeBallot(entry.Key)
-	}
+	hlog.checkCommitAndAct(votes, ballot, entry, opts)
 
-	return ballot, err
+	return ballot, nil
 }
 
 // Shutdown signals a shutdown and waits for all go-routines to exit before returning.  It

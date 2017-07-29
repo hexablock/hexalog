@@ -80,6 +80,22 @@ func (b *Ballot) Future() *FutureEntry {
 	return b.fentry
 }
 
+// Commits safely returns the number of current commits
+func (b *Ballot) Commits() int {
+	b.cmu.RLock()
+	defer b.cmu.RUnlock()
+
+	return len(b.committed)
+}
+
+// Proposals safely returns the number of current proposals
+func (b *Ballot) Proposals() int {
+	b.pmu.RLock()
+	defer b.pmu.RUnlock()
+
+	return len(b.proposed)
+}
+
 // votePropose submit a vote for the propose phase.  It takes an Entry hash id and a voter
 // as parameters.  If the voter has already voted it simply returns the proposed votes
 // with no error.  An error is returned if the supplied id does not match the the entry id
@@ -88,30 +104,33 @@ func (b *Ballot) votePropose(id []byte, voter string) (int, error) {
 	if atomic.LoadInt32(&b.closed) == 1 {
 		return -1, errBallotClosed
 	}
+
 	// Check the entry id to make sure it matches the ballot.
 	if bytes.Compare(b.fentry.ID(), id) != 0 {
 		return -1, errInvalidVoteID
 	}
 
-	b.pmu.RLock()
-	proposals := len(b.proposed)
-
-	// Check if voter already voted.
-	if _, ok := b.proposed[voter]; ok {
-		b.pmu.RUnlock()
-		return proposals, nil
-	}
-	b.pmu.RUnlock()
+	// b.pmu.RLock()
+	// proposals := len(b.proposed)
+	//
+	// // Check if voter already voted.
+	// if _, ok := b.proposed[voter]; ok {
+	// 	b.pmu.RUnlock()
+	// 	return proposals, nil
+	// }
+	// b.pmu.RUnlock()
 
 	// Return if required proposals are reached
-	if proposals == b.votes {
-		return proposals, nil
-	}
+	// if proposals == b.votes {
+	// 	return proposals, nil
+	// }
 
 	b.pmu.Lock()
+	defer b.pmu.Unlock()
+
 	b.proposed[voter] = struct{}{}
-	proposals = len(b.proposed)
-	b.pmu.Unlock()
+	proposals := len(b.proposed)
+	//b.pmu.Unlock()
 
 	// Initiaze timer if this is the first proposal for ballot.  Do not set ttl if it is
 	// the same voter,trying to vote again.
@@ -128,6 +147,7 @@ func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
 	if atomic.LoadInt32(&b.closed) == 1 {
 		return -1, errBallotClosed
 	}
+
 	// Check the entry id to make sure it matches the ballot.
 	if bytes.Compare(b.fentry.ID(), id) != 0 {
 		return -1, errInvalidVoteID
@@ -142,25 +162,27 @@ func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
 	// b.pmu.RUnlock()
 
 	// Make sure voter hasn't already voted
-	b.cmu.RLock()
-	if _, ok := b.committed[voter]; ok {
-		defer b.cmu.RUnlock()
-		return len(b.committed), nil
-	}
-	b.cmu.RUnlock()
+	// b.cmu.RLock()
+	// if _, ok := b.committed[voter]; ok {
+	// 	defer b.cmu.RUnlock()
+	// 	return len(b.committed), nil
+	// }
+	// b.cmu.RUnlock()
 
 	// Add commit vote
 	b.cmu.Lock()
+	defer b.cmu.Unlock()
+
 	b.committed[voter] = struct{}{}
 	commits := len(b.committed)
-	b.cmu.Unlock()
+	//b.cmu.Unlock()
 
 	// Check if we have enough commit votes to close the ballot.
 	// QUESTION: do we do any further checks with the no. of proposals and propose and
 	// commit voter to match?
-	if commits == b.votes {
-		b.close(nil)
-	}
+	// if commits == b.votes {
+	// 	b.close(nil)
+	// }
 
 	return commits, nil
 }
@@ -189,6 +211,8 @@ func (b *Ballot) close(err error) error {
 	b.timer.Stop()
 	atomic.StoreInt32(&b.closed, 1)
 	b.e = err
+
+	//log.Printf("[INFO] BALLOT CLOSED key=%s", b.fentry.Entry.Key)
 
 	switch err {
 	case nil:

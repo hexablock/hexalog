@@ -49,12 +49,6 @@ func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 	// 	return
 	// }
 
-	//
-	// TODO:
-	// Find how far we are behind if we are actually behind.
-	// Get the entries and start appending
-	//
-
 	// Check the previous hash
 	if bytes.Compare(entry.Previous, lastID) != 0 {
 		err = errPreviousHash
@@ -102,7 +96,10 @@ func (hlog *Hexalog) reapBallotsOnce() (c int) {
 			continue
 		}
 
-		log.Printf("[DEBUG] Ballot reaped key=%s error='%v'", k, b.Error())
+		props, commits := b.Proposals(), b.Commits()
+		log.Printf("[DEBUG] Ballot reaped key=%s proposals=%d commits=%d error='%v'",
+			k, props, commits, b.Error())
+
 		delete(hlog.ballots, k)
 		c++
 	}
@@ -207,15 +204,37 @@ func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
 	}
 }
 
+// checkVoteAct checks the number of commits and takes the appropriate action
+func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, entry *Entry, opts *RequestOptions) {
+	if currVotes == 1 {
+		// Broadcast commit entry
+		hlog.cch <- &RPCRequest{Entry: entry, Options: opts}
+
+	} else if currVotes == hlog.conf.Votes {
+
+		log.Printf("[INFO] Commit accepted host=%s key=%s height=%d ", hlog.conf.Hostname, entry.Key, entry.Height)
+		// Queue future entry to be applied to the FSM.
+		hlog.fsm.apply(ballot.fentry)
+		// Close the ballot after we've submitted to the fsm
+		ballot.close(nil)
+		// Ballot is closed.  Remove ballot and stop tracking
+		hlog.removeBallot(entry.Key)
+
+	}
+
+}
+
 // broadcastCommits starts consuming the commit broadcast channel to broadcast locally
 // committed entries to the network as part of voting.  This is mean to be run in a
 // go-routine.
 func (hlog *Hexalog) broadcastCommits() {
 	for msg := range hlog.cch {
+
 		err := hlog.broadcastCommit(msg.Entry, msg.Options)
 		if err == nil {
 			continue
 		}
+
 		hlog.ballotGetClose(msg.Entry.Key, err)
 
 		// Rollback the entry.
@@ -246,45 +265,3 @@ func (hlog *Hexalog) broadcastProposals() {
 	// Notify that we have shutdown
 	hlog.shutdownCh <- struct{}{}
 }
-
-//
-// func (hlog *Hexalog) healKeys() {
-// 	for r := range hlog.hch {
-// 		e := r.Entry
-// 		opts := r.Options
-// 		loc := opts.SourcePeer()
-//
-// 		keylog, err := hlog.store.GetKey(e.Key)
-// 		if err != nil {
-// 			if keylog, err = hlog.store.NewKey(e.Key, loc.ID); err != nil {
-// 				log.Printf("[ERROR] Heal failed to create key key=%s error='%v'", e.Key, err)
-// 				continue
-// 			}
-// 		}
-//
-// 		log.Printf("[DEBUG] Heal key=%s height=%d prev=%x", e.Key, e.Height, e.Previous)
-//
-// 		for _, peer := range opts.PeerSet {
-// 			// Skip ourself
-// 			if peer.Vnode.Host == hlog.conf.Hostname {
-// 				continue
-// 			}
-//
-// 			// Get last entry we have locally as it may have changed
-// 			last := keylog.LastEntry()
-// 			if last == nil {
-// 				last = &Entry{Key: e.Key}
-// 			}
-//
-// 			// Try to get as many entries as we can from a peer
-// 			if _, err = hlog.trans.FetchKeylog(peer.Vnode.Host, last); err != nil {
-// 				log.Printf("[ERROR] Fetch key log failed host=%s error='%v'", peer.Vnode.Host, err)
-// 			}
-//
-// 		}
-//
-// 	}
-//
-// 	log.Println("[INFO] Healer shutdown!")
-// 	hlog.shutdownCh <- struct{}{}
-// }
