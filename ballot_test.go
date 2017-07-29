@@ -78,9 +78,6 @@ func TestBallot_voteCommit(t *testing.T) {
 
 	fe2 := NewFutureEntry(testEID, nil)
 	b2 := newBallot(fe2, votes, ttl)
-	// if _, err := b2.voteCommit(testEID, "voter"); err != errProposalNotFound {
-	// 	t.Fatal("should fail with", errProposalNotFound.Error())
-	// }
 	for i := 0; i < votes-1; i++ {
 		if _, err := b2.votePropose(testEID, fmt.Sprintf("%d", i)); err != nil {
 			t.Fatal(err)
@@ -104,10 +101,16 @@ func TestBallot_voteCommit(t *testing.T) {
 		t.Fatalf("should fail with '%v' have='%v'", errInvalidVoteID, err)
 	}
 
-	b2.voteCommit(testEID, "0")
-	b2.voteCommit(testEID, "1")
+	b2.close(errPreviousHash)
 	if _, err := b2.voteCommit(testEID, "2"); err != errBallotClosed {
 		t.Fatal("should fail with ballot closed", err)
 	}
 
+	if er := b2.close(nil); er != errBallotAlreadyClosed {
+		t.Fatal("should fail with", errBallotAlreadyClosed)
+	}
+
+	if b2.Error().Error() != errPreviousHash.Error() {
+		t.Fatal("should have error", errPreviousHash)
+	}
 }

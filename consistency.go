@@ -43,6 +43,7 @@ func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 		lastID = last.Hash(hlog.conf.Hasher.New())
 	}
 
+	// TODO: Re-visit
 	// Check height
 	// if entry.Height != prevHeight+1 {
 	// 	err = errPreviousHash
@@ -97,8 +98,8 @@ func (hlog *Hexalog) reapBallotsOnce() (c int) {
 		}
 
 		props, commits := b.Proposals(), b.Commits()
-		log.Printf("[DEBUG] Ballot reaped key=%s proposals=%d commits=%d error='%v'",
-			k, props, commits, b.Error())
+		log.Printf("[DEBUG] Ballot reaped key=%s id=%x proposals=%d commits=%d error='%v'",
+			b.fentry.Entry.Key, k, props, commits, b.Error())
 
 		delete(hlog.ballots, k)
 		c++
@@ -205,7 +206,7 @@ func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
 }
 
 // checkVoteAct checks the number of commits and takes the appropriate action
-func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, entry *Entry, opts *RequestOptions) {
+func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte, entry *Entry, opts *RequestOptions) {
 	if currVotes == 1 {
 		// Broadcast commit entry
 		hlog.cch <- &RPCRequest{Entry: entry, Options: opts}
@@ -218,8 +219,7 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, entry *Ent
 		// Close the ballot after we've submitted to the fsm
 		ballot.close(nil)
 		// Ballot is closed.  Remove ballot and stop tracking
-		hlog.removeBallot(entry.Key)
-
+		hlog.removeBallot(key)
 	}
 
 }
@@ -235,7 +235,8 @@ func (hlog *Hexalog) broadcastCommits() {
 			continue
 		}
 
-		hlog.ballotGetClose(msg.Entry.Key, err)
+		id := msg.Entry.Hash(hlog.conf.Hasher.New())
+		hlog.ballotGetClose(id, err)
 
 		// Rollback the entry.
 		if er := hlog.store.RollbackEntry(msg.Entry); er != nil {
@@ -255,8 +256,10 @@ func (hlog *Hexalog) broadcastProposals() {
 	for msg := range hlog.pch {
 
 		if err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
-			// Close ballot with error if we still have the ballot and remove it
-			hlog.ballotGetClose(msg.Entry.Key, err)
+
+			id := msg.Entry.Hash(hlog.conf.Hasher.New())
+			hlog.ballotGetClose(id, err)
+
 		}
 
 	}

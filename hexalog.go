@@ -176,15 +176,15 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 		//
 		// TODO:
-		// Signal a retry
-		// Do not close ballot
+		// - Signal a retry
+		// - Do not close ballot
 		//
 
-		hlog.ballotGetClose(entry.Key, err)
+		hlog.ballotGetClose(id, err)
 		return nil, err
 	}
 
-	key := string(entry.Key)
+	key := string(id)
 
 	// Get or create ballot as necessary
 	hlog.mu.Lock()
@@ -223,10 +223,6 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 	vid := opts.SourcePeer().Vnode.Id
 	pvotes, err := ballot.votePropose(id, string(vid))
-	if err == errBallotClosed {
-		// TODO: This is a temporary fix needs to be addressed elsewhere
-		hlog.removeBallot(entry.Key)
-	}
 
 	log.Printf("[INFO] Propose host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
@@ -268,7 +264,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		if err == nil {
 
 			// Take action if we have the required commits
-			hlog.checkCommitAndAct(cvotes, ballot, entry, opts)
+			hlog.checkCommitAndAct(cvotes, ballot, id, entry, opts)
 
 		} else {
 
@@ -296,8 +292,10 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	// TODO: verify signature
 	//
 
+	id := entry.Hash(hlog.conf.Hasher.New())
+
 	// Make sure we have the ballot.  This locking scales better over the long run.
-	ballot := hlog.getBallot(entry.Key)
+	ballot := hlog.getBallot(id)
 	if ballot == nil {
 		return nil, errBallotNotFound
 	}
@@ -311,16 +309,10 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	//
 
 	vid := opts.PeerSet[opts.SourceIndex].Vnode.Id
-	id := entry.Hash(hlog.conf.Hasher.New())
 
 	votes, err := ballot.voteCommit(id, string(vid))
 	log.Printf("[INFO] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
-
-	if err == errBallotClosed {
-		// TODO: This is a temporary fix needs to be addressed elsewhere
-		hlog.removeBallot(entry.Key)
-	}
 
 	// We do not rollback here as we could have a faulty voter trying to commit without
 	// having a proposal.
@@ -328,7 +320,7 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 		return ballot, err
 	}
 
-	hlog.checkCommitAndAct(votes, ballot, entry, opts)
+	hlog.checkCommitAndAct(votes, ballot, id, entry, opts)
 
 	return ballot, nil
 }

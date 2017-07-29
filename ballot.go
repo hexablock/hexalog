@@ -110,27 +110,11 @@ func (b *Ballot) votePropose(id []byte, voter string) (int, error) {
 		return -1, errInvalidVoteID
 	}
 
-	// b.pmu.RLock()
-	// proposals := len(b.proposed)
-	//
-	// // Check if voter already voted.
-	// if _, ok := b.proposed[voter]; ok {
-	// 	b.pmu.RUnlock()
-	// 	return proposals, nil
-	// }
-	// b.pmu.RUnlock()
-
-	// Return if required proposals are reached
-	// if proposals == b.votes {
-	// 	return proposals, nil
-	// }
-
 	b.pmu.Lock()
 	defer b.pmu.Unlock()
 
 	b.proposed[voter] = struct{}{}
 	proposals := len(b.proposed)
-	//b.pmu.Unlock()
 
 	// Initiaze timer if this is the first proposal for ballot.  Do not set ttl if it is
 	// the same voter,trying to vote again.
@@ -153,38 +137,13 @@ func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
 		return -1, errInvalidVoteID
 	}
 
-	// Check if the voter has a proposal
-	// b.pmu.RLock()
-	// if _, ok := b.proposed[voter]; !ok {
-	// 	b.pmu.RUnlock()
-	// 	return -1, errProposalNotFound
-	// }
-	// b.pmu.RUnlock()
-
-	// Make sure voter hasn't already voted
-	// b.cmu.RLock()
-	// if _, ok := b.committed[voter]; ok {
-	// 	defer b.cmu.RUnlock()
-	// 	return len(b.committed), nil
-	// }
-	// b.cmu.RUnlock()
-
 	// Add commit vote
 	b.cmu.Lock()
 	defer b.cmu.Unlock()
 
 	b.committed[voter] = struct{}{}
-	commits := len(b.committed)
-	//b.cmu.Unlock()
+	return len(b.committed), nil
 
-	// Check if we have enough commit votes to close the ballot.
-	// QUESTION: do we do any further checks with the no. of proposals and propose and
-	// commit voter to match?
-	// if commits == b.votes {
-	// 	b.close(nil)
-	// }
-
-	return commits, nil
 }
 
 // setTTL starts the counter to appropriately expire the ballot
