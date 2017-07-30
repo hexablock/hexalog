@@ -2,7 +2,6 @@ package hexalog
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/hexablock/log"
 )
@@ -15,7 +14,7 @@ var (
 // using the library. It should return an interface or an error.  The return value is only
 // checked for an error type internally.
 type FSM interface {
-	Apply(entry *Entry) interface{}
+	Apply(entryID []byte, entry *Entry) interface{}
 }
 
 // StableStore is the interface used to store the FSM state.  It contains information about
@@ -31,8 +30,8 @@ type StableStore interface {
 type EchoFSM struct{}
 
 // Apply simply logs the Entry to stdout
-func (fsm *EchoFSM) Apply(entry *Entry) interface{} {
-	log.Printf("[INFO] Applied FSM key=%s height=%d", entry.Key, entry.Height)
+func (fsm *EchoFSM) Apply(entryID []byte, entry *Entry) interface{} {
+	log.Printf("[INFO] Applied FSM key=%s id=%x height=%d", entry.Key, entryID, entry.Height)
 	return map[string]string{"status": "ok"}
 }
 
@@ -61,6 +60,11 @@ func newFsm(f FSM, ss StableStore, hasher Hasher) (*fsm, error) {
 
 	err := ss.Open()
 	if err == nil {
+		//
+		// TODO: THIS MAY NEED TO HAPPEN ELSEWHERE
+		// - Check stable store for last applied position
+		// - Apply all remaining entries
+		//
 		go fsm.startApply()
 	}
 
@@ -69,6 +73,7 @@ func newFsm(f FSM, ss StableStore, hasher Hasher) (*fsm, error) {
 
 // apply queues the FutureEntry to the FSM.
 func (fsm *fsm) apply(entry *FutureEntry) {
+	entry.dispatch()
 	fsm.applyCh <- entry
 }
 
@@ -76,12 +81,13 @@ func (fsm *fsm) startApply() {
 
 	for fentry := range fsm.applyCh {
 		var (
-			e1   error
-			data interface{} = struct{}{}
+			e1    error
+			data  interface{} = struct{}{}
+			entry             = fentry.Entry
 		)
 
 		// Apply entry to application FSM
-		if resp := fsm.f.Apply(fentry.Entry); resp != nil {
+		if resp := fsm.f.Apply(fentry.ID(), entry); resp != nil {
 			// Check if the response is an error otherwise make the fsm data available
 			if e, ok := resp.(error); ok {
 				e1 = e
@@ -92,25 +98,13 @@ func (fsm *fsm) startApply() {
 		}
 
 		// Commit the last fsm applied entry to stable store
-		e2 := fsm.ss.Set(fentry.Entry.Key, fentry.Entry.Hash(fsm.hasher.New()))
+		e2 := fsm.ss.Set(entry.Key, entry.Hash(fsm.hasher.New()))
 
 		// Signal future that we applied the entry supplying the app fsm response or any errors
 		// encountered
 		fentry.applied(data, mergeErrors(e1, e2))
+		log.Printf("[INFO] Applied key=%s height=%d runtime=%v", entry.Key, entry.Height,
+			fentry.Runtime())
 	}
 
-}
-
-func mergeErrors(e1, e2 error) (err error) {
-
-	if e1 == nil && e2 == nil {
-	} else if e1 == nil {
-		err = e2
-	} else if e2 == nil {
-		err = e1
-	} else {
-		err = fmt.Errorf("%v; %v", e1, e2)
-	}
-
-	return err
 }

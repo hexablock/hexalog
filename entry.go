@@ -55,6 +55,10 @@ type FutureEntry struct {
 	// Channel used to signal entry was applied.  It contains the data from that returned
 	// from the application fsm i.e. data returned from FSM.Apply
 	done chan interface{}
+	// Time the entry was set to be applied to the fsm.
+	dispatched time.Time
+	// Time the entry was applied to the fsm.  This is set when a call to applied is made.
+	completed time.Time
 }
 
 // NewFutureEntry instantiates a new FutureEntry with an Entry.  It is an entry that is yet
@@ -87,11 +91,18 @@ func (entry FutureEntry) MarshalJSON() ([]byte, error) {
 // and an error as an argument to indicate whether it succeeded or failed.  The data is
 // only available if the error is nil
 func (entry *FutureEntry) applied(data interface{}, err error) {
+	entry.completed = time.Now()
+
 	if err != nil {
 		entry.err <- err
 	} else {
 		entry.done <- data
 	}
+}
+
+// dispatch sets the dispatched time to the current time
+func (entry *FutureEntry) dispatch() {
+	entry.dispatched = time.Now()
 }
 
 // Wait blocks until the entry has been applied to the FSM or the timeout has been reached
@@ -102,9 +113,17 @@ func (entry *FutureEntry) Wait(timeout time.Duration) (resp interface{}, err err
 		// resp will be th response from the application fsm.  If it returns a nil a struct{}{}
 		// is written instead
 	case err = <-entry.err:
+		// error returned from application fsm.
 	case <-time.After(timeout):
+		// The caller defined timeout reached
 		err = errTimedOut
 	}
 
 	return
+}
+
+// Runtime returns the time taken from when the entry was set to be applied to the FSM
+// until it was actually applied to the FSM
+func (entry *FutureEntry) Runtime() time.Duration {
+	return entry.completed.Sub(entry.dispatched)
 }

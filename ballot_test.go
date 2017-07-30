@@ -10,8 +10,8 @@ import (
 var testEID = []byte("test-id")
 
 func TestBallot_votePropose(t *testing.T) {
-
-	fe1 := NewFutureEntry(testEID, nil)
+	e1 := &Entry{Key: []byte("key"), Height: 1}
+	fe1 := NewFutureEntry(testEID, e1)
 	ballot := newBallot(fe1, 3, 1*time.Second)
 	for i := 0; i < 3; i++ {
 		if _, err := ballot.votePropose(testEID, fmt.Sprintf("%d", i)); err != nil {
@@ -24,7 +24,8 @@ func TestBallot_votePropose(t *testing.T) {
 		t.Fatalf("proposal mismatch want=3 have=%d", ballot.Proposals())
 	}
 
-	fe2 := NewFutureEntry(testEID, nil)
+	e2 := &Entry{Key: []byte("key"), Height: 2}
+	fe2 := NewFutureEntry(testEID, e2)
 	b2 := newBallot(fe2, 3, 1*time.Second)
 	_, err := b2.votePropose(testEID, "voter")
 	if err != nil {
@@ -47,7 +48,8 @@ func TestBallot_voteCommit(t *testing.T) {
 	ttl := 1 * time.Second
 	votes := 3
 
-	fe1 := NewFutureEntry(testEID, nil)
+	e1 := &Entry{Key: []byte("key"), Height: 1}
+	fe1 := NewFutureEntry(testEID, e1)
 	b1 := newBallot(fe1, votes, ttl)
 	for i := 0; i < votes; i++ {
 		if _, err := b1.votePropose(testEID, fmt.Sprintf("%d", i)); err != nil {
@@ -76,7 +78,8 @@ func TestBallot_voteCommit(t *testing.T) {
 		t.Error("id's should match")
 	}
 
-	fe2 := NewFutureEntry(testEID, nil)
+	e2 := &Entry{Key: []byte("key"), Height: 2}
+	fe2 := NewFutureEntry(testEID, e2)
 	b2 := newBallot(fe2, votes, ttl)
 	for i := 0; i < votes-1; i++ {
 		if _, err := b2.votePropose(testEID, fmt.Sprintf("%d", i)); err != nil {
@@ -113,4 +116,6 @@ func TestBallot_voteCommit(t *testing.T) {
 	if b2.Error().Error() != errPreviousHash.Error() {
 		t.Fatal("should have error", errPreviousHash)
 	}
+
+	t.Logf("Ballot runtime: %v", b2.Runtime())
 }

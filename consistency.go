@@ -213,7 +213,7 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 
 	} else if currVotes == hlog.conf.Votes {
 
-		log.Printf("[INFO] Commit accepted host=%s key=%s height=%d ", hlog.conf.Hostname, entry.Key, entry.Height)
+		log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.Hostname, entry.Key, entry.Height)
 		// Queue future entry to be applied to the FSM.
 		hlog.fsm.apply(ballot.fentry)
 		// Close the ballot after we've submitted to the fsm
@@ -230,17 +230,19 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 func (hlog *Hexalog) broadcastCommits() {
 	for msg := range hlog.cch {
 
-		err := hlog.broadcastCommit(msg.Entry, msg.Options)
+		en := msg.Entry
+
+		err := hlog.broadcastCommit(en, msg.Options)
 		if err == nil {
 			continue
 		}
 
-		id := msg.Entry.Hash(hlog.conf.Hasher.New())
+		id := en.Hash(hlog.conf.Hasher.New())
 		hlog.ballotGetClose(id, err)
 
 		// Rollback the entry.
-		if er := hlog.store.RollbackEntry(msg.Entry); er != nil {
-			log.Println("[ERROR]", er)
+		if er := hlog.store.RollbackEntry(en); er != nil {
+			log.Printf("[ERROR] Failed to rollback key=%s height=%d id=%x error='%v'", en.Key, en.Height, id, er)
 		}
 
 	}

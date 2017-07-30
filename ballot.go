@@ -15,10 +15,9 @@ var (
 	errBallotClosed        = errors.New("ballot closed")
 	errBallotAlreadyClosed = errors.New("ballot already closed")
 	errBallotNotFound      = errors.New("ballot not found")
-	//errProposalNotFound    = errors.New("proposal not found")
-	errNotEnoughProposals = errors.New("not enough proposals")
-	errVoterAlreadyVoted  = errors.New("voter already voted")
-	errInvalidVoteID      = errors.New("invalid vote id")
+	errNotEnoughProposals  = errors.New("not enough proposals")
+	errVoterAlreadyVoted   = errors.New("voter already voted")
+	errInvalidVoteID       = errors.New("invalid vote id")
 )
 
 // Ballot holds information to execute a singular distributed operation ensuring consistency.  It is
@@ -27,6 +26,10 @@ type Ballot struct {
 	// Future for the Entry being voted on.  This is used to know and wait on when an actual
 	// entry is applied to the application defined FSM
 	fentry *FutureEntry
+	// Time voting first began on the ballot
+	dispatched time.Time
+	// Time ballot was closed
+	completed time.Time
 	// TTL for the ballot. The ballot is closed once the ttl has been reached
 	ttl time.Duration
 	// TTL timer
@@ -119,6 +122,7 @@ func (b *Ballot) votePropose(id []byte, voter string) (int, error) {
 	// Initiaze timer if this is the first proposal for ballot.  Do not set ttl if it is
 	// the same voter,trying to vote again.
 	if proposals == 1 {
+		b.dispatched = time.Now()
 		b.setTTL()
 	}
 
@@ -167,11 +171,11 @@ func (b *Ballot) close(err error) error {
 		return errBallotAlreadyClosed
 	}
 
+	b.completed = time.Now()
+
 	b.timer.Stop()
 	atomic.StoreInt32(&b.closed, 1)
 	b.e = err
-
-	//log.Printf("[INFO] BALLOT CLOSED key=%s", b.fentry.Entry.Key)
 
 	switch err {
 	case nil:
@@ -179,11 +183,18 @@ func (b *Ballot) close(err error) error {
 	default:
 		b.err <- err
 	}
-	//log.Printf("[DEBUG] Ballot closed: ballot=%p errors=%d completed=%d msg='%v'", b, len(b.err), len(b.done), err)
+
+	log.Printf("[INFO] Ballot closed key=%s height=%d ballot=%p runtime=%v error='%v'",
+		b.fentry.Entry.Key, b.fentry.Entry.Height, b, b.Runtime(), err)
 	return nil
 }
 
 // Error returns the error the ballot was closed with if any
 func (b *Ballot) Error() error {
 	return b.e
+}
+
+// Runtime returns the amount of time taken for this ballot to complete
+func (b *Ballot) Runtime() time.Duration {
+	return b.completed.Sub(b.dispatched)
 }

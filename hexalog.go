@@ -93,7 +93,7 @@ type Hexalog struct {
 	// request down this channel to allow applications to try to recover. This is usually
 	// the case when a keylog falls behind.
 	hch chan *RPCRequest
-
+	// Gets set when once a shutdown is signalled
 	shutdown int32
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
 	// queue is not part of this number
@@ -224,7 +224,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	vid := opts.SourcePeer().Vnode.Id
 	pvotes, err := ballot.votePropose(id, string(vid))
 
-	log.Printf("[INFO] Propose host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+	log.Printf("[DEBUG] Propose host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
 
 	if err != nil {
@@ -246,7 +246,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		hlog.pch <- &RPCRequest{Entry: entry, Options: opts}
 
 	} else if pvotes == hlog.conf.Votes {
-		log.Printf("[INFO] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
+		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
 
 		if err = hlog.store.AppendEntry(entry); err != nil {
 
@@ -311,7 +311,7 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	vid := opts.PeerSet[opts.SourceIndex].Vnode.Id
 
 	votes, err := ballot.voteCommit(id, string(vid))
-	log.Printf("[INFO] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+	log.Printf("[DEBUG] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
 	// We do not rollback here as we could have a faulty voter trying to commit without

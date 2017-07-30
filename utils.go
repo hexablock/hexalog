@@ -1,13 +1,6 @@
 package hexalog
 
-// type HexError struct {
-// 	meta map[string]interface{}
-// 	err  string
-// }
-//
-// func (err *HexError) Error() string {
-// 	return err.err
-// }
+import "fmt"
 
 // assumes equal length
 func equalBytes(a, b []byte) bool {
@@ -19,4 +12,18 @@ func equalBytes(a, b []byte) bool {
 	}
 
 	return true
+}
+
+func mergeErrors(e1, e2 error) (err error) {
+
+	if e1 == nil && e2 == nil {
+	} else if e1 == nil {
+		err = e2
+	} else if e2 == nil {
+		err = e1
+	} else {
+		err = fmt.Errorf("%v; %v", e1, e2)
+	}
+
+	return err
 }
