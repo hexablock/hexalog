@@ -2,6 +2,7 @@ package hexalog
 
 import (
 	"crypto/sha1"
+	"encoding/json"
 	"hash"
 )
 
@@ -25,4 +26,10 @@ func (hasher *SHA1Hasher) New() hash.Hash {
 // Algorithm returns the hashing algorithm the hasher implements
 func (hasher *SHA1Hasher) Algorithm() HashAlgorithm {
 	return HashAlgorithm("SHA1")
+}
+
+func (hasher SHA1Hasher) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"Algorithm": hasher.Algorithm(),
+	})
 }

@@ -340,7 +340,7 @@ func (hlog *Hexalog) Shutdown() {
 	close(hlog.cch)
 	close(hlog.hch)
 
-	// Wait for echo go-routine to exit their loop
+	// Wait for go-routines to exit their loop - propose, commit, reap ballots
 	for i := 0; i < 3; i++ {
 		<-hlog.shutdownCh
 	}
