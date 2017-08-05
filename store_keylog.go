@@ -72,7 +72,7 @@ func (keylog *InMemKeylogStore) LastEntry() *Entry {
 
 // AppendEntry appends an entry to the log.  It returns an error if there is a previous
 // hash mismatch
-func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) error {
+func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) (err error) {
 
 	lastHash, currHeight := keylog.lastHashHeight()
 
@@ -86,9 +86,9 @@ func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) error {
 	defer keylog.mu.Unlock()
 
 	keylog.entries = append(keylog.entries, entry)
-	log.Printf("[DEBUG] Appended key=%s last=%x id=%x", entry.Key, lastHash, entry.Hash(keylog.hasher.New()))
+	log.Printf("[DEBUG] Appended key=%s height=%d id=%x", entry.Key, entry.Height, entry.Hash(keylog.hasher.New()))
 
-	return nil
+	return
 }
 
 // GetEntry gets and entry from the InMemKeylogStore

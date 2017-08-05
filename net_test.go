@@ -29,10 +29,13 @@ func TestNetTransport(t *testing.T) {
 		t.Fatal(err, ballot)
 	}
 
+	t.Logf("time ballot=%v fsm=%v", ballot.Runtime(), ballot.fentry.Runtime())
+	<-time.After(50 * time.Millisecond)
+
 	id := entry.Hash(s1.hlog.conf.Hasher.New())
 	e2, err := s1.hlog.trans.GetEntry("127.0.0.1:43212", []byte("testkey"), id, &RequestOptions{})
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("key=testkey id=%x %v", id, err)
 	}
 
 	id2 := e2.Hash(s1.hlog.conf.Hasher.New())

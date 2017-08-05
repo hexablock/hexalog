@@ -164,21 +164,31 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 	// Verify entry
 	prevHeight, err := hlog.verifyEntry(entry)
+	// This will be errPreviousHash
 	if err != nil {
-		// Only try to heal if the new height is > then the current one
-		if entry.Height > prevHeight {
-			hlog.hch <- &RPCRequest{
-				ID:      id,    // entry hash id
-				Entry:   entry, // entry itself
-				Options: opts,  // participating peers
-			}
-		}
 
-		//
-		// TODO:
-		// - Signal a retry
-		// - Do not close ballot
-		//
+		if err == errPreviousHash {
+			// Only try to heal if the new height is > then the current one
+			if entry.Height > prevHeight {
+
+				hlog.hch <- &RPCRequest{
+					ID:      id,    // entry hash id
+					Entry:   entry, // entry itself
+					Options: opts,  // participating peers
+				}
+
+				// ?? We return here to allow a retry
+				// ?? return nil, err
+
+				//
+				// TODO: Gate to avoid an infinite retry
+				//
+
+				// Retry
+				return hlog.Propose(entry, opts)
+			}
+
+		}
 
 		hlog.ballotGetClose(id, err)
 		return nil, err
@@ -248,15 +258,10 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
 
-		if err = hlog.store.AppendEntry(entry); err != nil {
-
-			//
-			// TODO: ???
-			//
-
-			ballot.close(err)
-			return ballot, err
-		}
+		// if err = hlog.store.AppendEntry(entry); err != nil {
+		// 	ballot.close(err)
+		// 	return ballot, err
+		// }
 
 		// Start local commit phase.  We use our index as the voter
 		var cvotes int

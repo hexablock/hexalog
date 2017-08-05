@@ -29,6 +29,8 @@ func (hlog *Hexalog) append(id []byte, entry *Entry) (fentry *FutureEntry, err e
 	return
 }
 
+// verifyEntry verifies an entry. It returns an errPreviousHash is the previous hash does
+// not match
 func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 	//
 	// TODO: verify signature
@@ -212,6 +214,11 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 		hlog.cch <- &RPCRequest{Entry: entry, Options: opts}
 
 	} else if currVotes == hlog.conf.Votes {
+
+		if err := hlog.store.AppendEntry(entry); err != nil {
+			ballot.close(err)
+			return
+		}
 
 		log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.Hostname, entry.Key, entry.Height)
 		// Queue future entry to be applied to the FSM.
