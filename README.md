@@ -3,5 +3,10 @@ Hexalog implements a consensus protocol in a peer-to-peer system leveraging the 
 overlay network.  
 
 Hexalog is unique in that it does not have a dedicated master or a leader-follower setup.  
-Instead a set of peers participating in the cluster, vote amongst  themselves to come to  
-come to a consensus.
+Instead a set of peers participating in the cluster, vote amongst themselves to come to  
+come to consensus.
+
+### Roadmap
+
+- Persistence
+- Entry signing & verification
