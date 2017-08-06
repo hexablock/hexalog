@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -20,7 +21,7 @@ type keylogStore struct {
 	// Location id
 	locationID []byte
 	// Hash function used to generate id's
-	hasher Hasher
+	hasher hexatype.Hasher
 }
 
 // InMemKeylogStore contains all log entries for a key.
@@ -33,7 +34,7 @@ type InMemKeylogStore struct {
 
 // NewInMemKeylogStore initializes a new log for a key. It takes a key, location id and hash function used
 // to compute hash id's of log entries.
-func NewInMemKeylogStore(key, locationID []byte, hasher Hasher) *InMemKeylogStore {
+func NewInMemKeylogStore(key, locationID []byte, hasher hexatype.Hasher) *InMemKeylogStore {
 	return &InMemKeylogStore{
 		keylogStore: &keylogStore{Key: key, hasher: hasher, locationID: locationID},
 		entries:     []*Entry{},

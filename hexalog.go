@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -52,9 +53,9 @@ type Config struct {
 	HealBufSize        int // Buffer size for heal requests
 	BroadcastBufSize   int // proposal and commit broadcast buffer
 	BallotReapInterval time.Duration
-	TTL                time.Duration // ttl for each ballot
-	Votes              int           // votes required
-	Hasher             Hasher        // hash function generator
+	TTL                time.Duration   // ttl for each ballot
+	Votes              int             // votes required
+	Hasher             hexatype.Hasher // hash function generator
 }
 
 // DefaultConfig returns a sane set of default configurations.  The default hash function
@@ -67,7 +68,7 @@ func DefaultConfig(hostname string) *Config {
 		BallotReapInterval: 30 * time.Second,
 		TTL:                3 * time.Second,
 		Votes:              3,
-		Hasher:             &SHA1Hasher{},
+		Hasher:             &hexatype.SHA1Hasher{},
 	}
 }
 
@@ -179,6 +180,8 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 				// ?? We return here to allow a retry
 				// ?? return nil, err
+
+				// TODO: Get a future and use that instead
 
 				//
 				// TODO: Gate to avoid an infinite retry

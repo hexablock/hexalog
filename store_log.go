@@ -6,6 +6,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/hexablock/hexatype"
 )
 
 var (
@@ -35,11 +37,11 @@ type InMemLogStore struct {
 	mu sync.RWMutex
 	m  map[string]KeylogStore
 	// Hash to use when calculating id's
-	hasher Hasher
+	hasher hexatype.Hasher
 }
 
 // NewInMemLogStore initializes a new in-memory log store
-func NewInMemLogStore(hasher Hasher) *InMemLogStore {
+func NewInMemLogStore(hasher hexatype.Hasher) *InMemLogStore {
 	return &InMemLogStore{
 		m:      make(map[string]KeylogStore),
 		hasher: hasher,

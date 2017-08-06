@@ -10,6 +10,7 @@ import (
 
 	chord "github.com/hexablock/go-chord"
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -64,7 +65,7 @@ func initTestServer(addr string) *testServer {
 	RegisterHexalogRPCServer(server, trans)
 
 	ss := &MockStableStore{}
-	ls := NewInMemLogStore(&SHA1Hasher{})
+	ls := NewInMemLogStore(&hexatype.SHA1Hasher{})
 	hlog, _ := initHexalog(addr, ls, ss, trans)
 
 	go server.Serve(ln)

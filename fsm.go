@@ -3,6 +3,7 @@ package hexalog
 import (
 	"errors"
 
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -45,12 +46,12 @@ type fsm struct {
 	// Stable store to track which entries have been applied to the fsm.
 	ss StableStore
 
-	hasher Hasher
+	hasher hexatype.Hasher
 }
 
 // newFsm initializes a new fsm with the given stable store and hash function.  It opens
 // the store and starts the applying in a separate go routine.
-func newFsm(f FSM, ss StableStore, hasher Hasher) (*fsm, error) {
+func newFsm(f FSM, ss StableStore, hasher hexatype.Hasher) (*fsm, error) {
 	fsm := &fsm{
 		f:       f,
 		applyCh: make(chan *FutureEntry),
