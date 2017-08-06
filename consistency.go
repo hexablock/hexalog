@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -19,7 +20,7 @@ import (
 // to the FSM otherwise returns an error.  This call bypasses the voting process and tries
 // to append to the log directly.  This is only to be used during rebalancing and healing.
 // These entries would already have been accepted by the network and thus be valid.
-func (hlog *Hexalog) append(id []byte, entry *Entry) (fentry *FutureEntry, err error) {
+func (hlog *Hexalog) append(id []byte, entry *hexatype.Entry) (fentry *FutureEntry, err error) {
 
 	if err = hlog.store.AppendEntry(entry); err == nil {
 		fentry = NewFutureEntry(id, entry)
@@ -31,7 +32,7 @@ func (hlog *Hexalog) append(id []byte, entry *Entry) (fentry *FutureEntry, err e
 
 // verifyEntry verifies an entry. It returns an errPreviousHash is the previous hash does
 // not match
-func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
+func (hlog *Hexalog) verifyEntry(entry *hexatype.Entry) (prevHeight uint32, err error) {
 	//
 	// TODO: verify signature
 	//
@@ -111,7 +112,7 @@ func (hlog *Hexalog) reapBallotsOnce() (c int) {
 	return
 }
 
-func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error {
+func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
@@ -138,7 +139,7 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error 
 	return nil
 }
 
-func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
+func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
@@ -182,7 +183,7 @@ func (hlog *Hexalog) removeBallot(key []byte) {
 	hlog.mu.Unlock()
 }
 
-func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
+func (hlog *Hexalog) checkOptions(opts *hexatype.RequestOptions) error {
 	if opts.PeerSet == nil || len(opts.PeerSet) < hlog.conf.Votes {
 		return errInsufficientPeers
 	}
@@ -208,10 +209,10 @@ func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
 }
 
 // checkVoteAct checks the number of commits and takes the appropriate action
-func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte, entry *Entry, opts *RequestOptions) {
+func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte, entry *hexatype.Entry, opts *hexatype.RequestOptions) {
 	if currVotes == 1 {
 		// Broadcast commit entry
-		hlog.cch <- &ReqResp{Entry: entry, Options: opts}
+		hlog.cch <- &hexatype.ReqResp{Entry: entry, Options: opts}
 
 	} else if currVotes == hlog.conf.Votes {
 

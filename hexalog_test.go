@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	testOpts = &RequestOptions{
+	testOpts = &hexatype.RequestOptions{
 		PeerSet: []*hexaring.Location{
 			&hexaring.Location{ID: []byte("1"),
 				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:43211"}},
@@ -25,7 +25,7 @@ var (
 				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:43213"}},
 		},
 	}
-	testOpts1 = &RequestOptions{
+	testOpts1 = &hexatype.RequestOptions{
 		PeerSet: []*hexaring.Location{
 			&hexaring.Location{ID: []byte("1"),
 				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:53211"}},

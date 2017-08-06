@@ -2,34 +2,12 @@ syntax = "proto3";
 
 package hexalog;
 
-import "github.com/hexablock/hexaring/structs.proto";
+import "github.com/hexablock/hexatype/types.proto";
 
 service HexalogRPC {
-    rpc ProposeRPC(ReqResp) returns (ReqResp) {}
-    rpc CommitRPC(ReqResp) returns (ReqResp) {}
-    rpc GetRPC(ReqResp) returns (ReqResp) {}
-    rpc TransferKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
-    rpc FetchKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
-}
-
-message Entry {
-    bytes Previous = 1;
-    uint64 Timestamp = 2;
-    uint32 Height = 3;
-    bytes Key = 4;
-    bytes Data = 5;
-}
-
-// Request and response shared structure
-message ReqResp {
-    bytes ID = 1;
-    Entry Entry = 2;
-    RequestOptions Options = 3;
-}
-
-message RequestOptions {
-    // Index of the source in the PeerSet.  This is set internally by the log
-    int32 SourceIndex = 1;
-    // Set of peers for the request.
-    repeated hexaring.Location PeerSet = 2;
+    rpc ProposeRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
+    rpc CommitRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
+    rpc GetRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
+    rpc TransferKeylogRPC(stream hexatype.ReqResp) returns (stream hexatype.ReqResp) {}
+    rpc FetchKeylogRPC(stream hexatype.ReqResp) returns (stream hexatype.ReqResp) {}
 }

@@ -29,7 +29,7 @@ type InMemKeylogStore struct {
 	*keylogStore
 	// Log entries for the key.
 	mu      sync.RWMutex
-	entries []*Entry
+	entries []*hexatype.Entry
 }
 
 // NewInMemKeylogStore initializes a new log for a key. It takes a key, location id and hash function used
@@ -37,7 +37,7 @@ type InMemKeylogStore struct {
 func NewInMemKeylogStore(key, locationID []byte, hasher hexatype.Hasher) *InMemKeylogStore {
 	return &InMemKeylogStore{
 		keylogStore: &keylogStore{Key: key, hasher: hasher, locationID: locationID},
-		entries:     []*Entry{},
+		entries:     []*hexatype.Entry{},
 	}
 }
 
@@ -61,7 +61,7 @@ func (keylog *InMemKeylogStore) LocationID() []byte {
 
 // LastEntry returns the last entry in the InMemKeylogStore.  If there are no entries in the log ,
 // nil is returned.
-func (keylog *InMemKeylogStore) LastEntry() *Entry {
+func (keylog *InMemKeylogStore) LastEntry() *hexatype.Entry {
 	keylog.mu.RLock()
 	defer keylog.mu.RUnlock()
 
@@ -73,7 +73,7 @@ func (keylog *InMemKeylogStore) LastEntry() *Entry {
 
 // AppendEntry appends an entry to the log.  It returns an error if there is a previous
 // hash mismatch
-func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) (err error) {
+func (keylog *InMemKeylogStore) AppendEntry(entry *hexatype.Entry) (err error) {
 
 	lastHash, currHeight := keylog.lastHashHeight()
 
@@ -93,7 +93,7 @@ func (keylog *InMemKeylogStore) AppendEntry(entry *Entry) (err error) {
 }
 
 // GetEntry gets and entry from the InMemKeylogStore
-func (keylog *InMemKeylogStore) GetEntry(id []byte) (*Entry, error) {
+func (keylog *InMemKeylogStore) GetEntry(id []byte) (*hexatype.Entry, error) {
 	keylog.mu.RLock()
 	defer keylog.mu.RUnlock()
 
@@ -108,7 +108,7 @@ func (keylog *InMemKeylogStore) GetEntry(id []byte) (*Entry, error) {
 
 // RollbackEntry rolls the keylog back by the entry.  It only rolls back if the entry is
 // the last entry.  It returns the number of entries remaining in the log and/or an error
-func (keylog *InMemKeylogStore) RollbackEntry(entry *Entry) (int, error) {
+func (keylog *InMemKeylogStore) RollbackEntry(entry *hexatype.Entry) (int, error) {
 	hasher := keylog.hasher.New()
 	id := entry.Hash(hasher)
 	// Reset for re-use
@@ -134,7 +134,7 @@ func (keylog *InMemKeylogStore) RollbackEntry(entry *Entry) (int, error) {
 }
 
 // Entries returns all log entries in the key log
-func (keylog *InMemKeylogStore) Entries() []*Entry {
+func (keylog *InMemKeylogStore) Entries() []*hexatype.Entry {
 	keylog.mu.RLock()
 	defer keylog.mu.RUnlock()
 
@@ -143,7 +143,7 @@ func (keylog *InMemKeylogStore) Entries() []*Entry {
 
 // Iter iterates over entries starting from the seek position.  It iterates over all
 // entries if seek is nil
-func (keylog *InMemKeylogStore) Iter(seek []byte, cb func(entry *Entry) error) error {
+func (keylog *InMemKeylogStore) Iter(seek []byte, cb func(entry *hexatype.Entry) error) error {
 	keylog.mu.RLock()
 	defer keylog.mu.RUnlock()
 
@@ -219,7 +219,7 @@ func (keylog *InMemKeylogStore) lastHashHeight() (lastID []byte, height uint32) 
 // func (keylog *InMemKeylogStore) Snapshot() (KeylogStore, error) {
 // 	ks := NewInMemKeylogStore(keylog.Key, keylog.locationID, keylog.hasher)
 //
-// 	ks.entries = make([]*Entry, len(ks.entries))
+// 	ks.entries = make([]*hexatype.Entry, len(ks.entries))
 // 	for i, entry := range keylog.entries {
 // 		ks.entries[i] = entry.Clone()
 // 	}

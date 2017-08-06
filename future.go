@@ -1,47 +1,12 @@
 package hexalog
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"hash"
 	"time"
+
+	"github.com/hexablock/hexatype"
 )
-
-// Clone clones an entry
-func (entry *Entry) Clone() *Entry {
-	return &Entry{
-		Key:       entry.Key,
-		Previous:  entry.Previous,
-		Timestamp: entry.Timestamp,
-		Height:    entry.Height,
-		Data:      entry.Data,
-	}
-}
-
-// MarshalJSON is a custom JSON marshaler for Entry
-func (entry Entry) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{
-		"Key":       entry.Key,
-		"Previous":  hex.EncodeToString(entry.Previous),
-		"Timestamp": entry.Timestamp,
-		"Height":    entry.Height,
-		"Data":      entry.Data,
-	}
-	return json.Marshal(m)
-}
-
-// Hash computes the hash of the entry using the hash function
-func (entry *Entry) Hash(hashFunc hash.Hash) []byte {
-	hashFunc.Write(entry.Previous)
-	binary.Write(hashFunc, binary.BigEndian, entry.Timestamp)
-	binary.Write(hashFunc, binary.BigEndian, entry.Height)
-	hashFunc.Write(entry.Key)
-	hashFunc.Write(entry.Data)
-
-	sh := hashFunc.Sum(nil)
-	return sh[:]
-}
 
 // FutureEntry is an entry that been committed to the stable store but has not yet been
 // applied to the FSM.
@@ -49,7 +14,7 @@ type FutureEntry struct {
 	// This is the hash id of the entry that is supplied upon instantiation
 	id []byte
 	// Entry to be applied
-	Entry *Entry
+	Entry *hexatype.Entry
 	// Channel used to signal applying entry failed
 	err chan error
 	// Channel used to signal entry was applied.  It contains the data from that returned
@@ -64,7 +29,7 @@ type FutureEntry struct {
 // NewFutureEntry instantiates a new FutureEntry with an Entry.  It is an entry that is yet
 // to be applied to the log. It can be used to wait for the entry to be applied.  It takes
 // the hash id of the entry and entry as parameters.
-func NewFutureEntry(id []byte, entry *Entry) *FutureEntry {
+func NewFutureEntry(id []byte, entry *hexatype.Entry) *FutureEntry {
 	return &FutureEntry{
 		id:    id,
 		Entry: entry,

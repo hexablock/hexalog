@@ -22,12 +22,12 @@ var (
 type KeylogStore interface {
 	LocationID() []byte
 	Height() uint32
-	Iter(seek []byte, cb func(entry *Entry) error) error
-	GetEntry(id []byte) (*Entry, error)
-	LastEntry() *Entry
-	AppendEntry(entry *Entry) error
-	RollbackEntry(entry *Entry) (int, error)
-	Entries() []*Entry
+	Iter(seek []byte, cb func(entry *hexatype.Entry) error) error
+	GetEntry(id []byte) (*hexatype.Entry, error)
+	LastEntry() *hexatype.Entry
+	AppendEntry(entry *hexatype.Entry) error
+	RollbackEntry(entry *hexatype.Entry) (int, error)
+	Entries() []*hexatype.Entry
 }
 
 // InMemLogStore is the whole log containing all keys.  It manages serialization of
@@ -75,7 +75,7 @@ func (hlog *InMemLogStore) sortedKeys() []string {
 }
 
 // GetEntry gets an entry by key and id of the entry
-func (hlog *InMemLogStore) GetEntry(key, id []byte) (*Entry, error) {
+func (hlog *InMemLogStore) GetEntry(key, id []byte) (*hexatype.Entry, error) {
 	k := string(key)
 
 	hlog.mu.RLock()
@@ -89,7 +89,7 @@ func (hlog *InMemLogStore) GetEntry(key, id []byte) (*Entry, error) {
 }
 
 // LastEntry gets the last entry for a key form the log
-func (hlog *InMemLogStore) LastEntry(key []byte) *Entry {
+func (hlog *InMemLogStore) LastEntry(key []byte) *hexatype.Entry {
 	k := string(key)
 
 	hlog.mu.RLock()
@@ -119,7 +119,7 @@ func (hlog *InMemLogStore) NewKey(key, locationID []byte) (keylog KeylogStore, e
 }
 
 // NewEntry sets the previous hash and height for a new Entry and returns it
-func (hlog *InMemLogStore) NewEntry(key []byte) *Entry {
+func (hlog *InMemLogStore) NewEntry(key []byte) *hexatype.Entry {
 
 	var (
 		h             = hlog.hasher.New()
@@ -140,7 +140,7 @@ func (hlog *InMemLogStore) NewEntry(key []byte) *Entry {
 	}
 	hlog.mu.Unlock()
 
-	return &Entry{
+	return &hexatype.Entry{
 		Key:       key,
 		Previous:  prev,
 		Height:    height,
@@ -150,7 +150,7 @@ func (hlog *InMemLogStore) NewEntry(key []byte) *Entry {
 
 // RollbackEntry rolls the log back to the given entry.  The entry must be the last entry in
 // the log
-func (hlog *InMemLogStore) RollbackEntry(entry *Entry) error {
+func (hlog *InMemLogStore) RollbackEntry(entry *hexatype.Entry) error {
 	key := string(entry.Key)
 
 	hlog.mu.RLock()
@@ -204,7 +204,7 @@ func (hlog *InMemLogStore) RemoveKey(key []byte) error {
 }
 
 // AppendEntry appends an entry to a KeyLog.  If the key does not exist it returns an error
-func (hlog *InMemLogStore) AppendEntry(entry *Entry) error {
+func (hlog *InMemLogStore) AppendEntry(entry *hexatype.Entry) error {
 	k := string(entry.Key)
 
 	hlog.mu.Lock()

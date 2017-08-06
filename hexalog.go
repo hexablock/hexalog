@@ -19,15 +19,15 @@ var (
 // Transport implements a Hexalog network transport
 type Transport interface {
 	// Gets an entry from a remote host
-	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
+	GetEntry(host string, key, id []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error)
 	// Proposes an entry on the remote host
-	ProposeEntry(host string, entry *Entry, opts *RequestOptions) error
+	ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Commits an entry on the remote host
-	CommitEntry(host string, entry *Entry, opts *RequestOptions) error
+	CommitEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Transfers a key to the remote host
 	TransferKeylog(host string, key []byte) error
 	// Gets all entries for a key starting at entry
-	FetchKeylog(host string, entry *Entry) (*FutureEntry, error)
+	FetchKeylog(host string, entry *hexatype.Entry) (*FutureEntry, error)
 	// Registers the log when available
 	Register(hlog *Hexalog)
 	// Shutdown the transport closing outbound connections
@@ -39,12 +39,12 @@ type LogStore interface {
 	NewKey(key, locationID []byte) (KeylogStore, error)
 	GetKey(key []byte) (KeylogStore, error)
 	RemoveKey(key []byte) error
-	NewEntry(key []byte) *Entry
-	GetEntry(key, id []byte) (*Entry, error)
-	LastEntry(key []byte) *Entry
+	NewEntry(key []byte) *hexatype.Entry
+	GetEntry(key, id []byte) (*hexatype.Entry, error)
+	LastEntry(key []byte) *hexatype.Entry
 	Iter(func(key string, locationID []byte))
-	AppendEntry(entry *Entry) error
-	RollbackEntry(entry *Entry) error
+	AppendEntry(entry *hexatype.Entry) error
+	RollbackEntry(entry *hexatype.Entry) error
 }
 
 // Config holds the configuration for the log.  This is used to initialize the log.
@@ -87,13 +87,13 @@ type Hexalog struct {
 	// to the FSM
 	store LogStore
 	// Propose broadcast channel to broadcast proposals to the network peer set
-	pch chan *ReqResp
+	pch chan *hexatype.ReqResp
 	// Commit broadcast channel to broadcast commits to the network peer set
-	cch chan *ReqResp
+	cch chan *hexatype.ReqResp
 	// Channel for heal requests.  When previous hash mismatches occur, the log will send a
 	// request down this channel to allow applications to try to recover. This is usually
 	// the case when a keylog falls behind.
-	hch chan *ReqResp
+	hch chan *hexatype.ReqResp
 	// Gets set when once a shutdown is signalled
 	shutdown int32
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
@@ -114,9 +114,9 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 		fsm:        ifsm,
 		trans:      trans,
 		ballots:    make(map[string]*Ballot),
-		pch:        make(chan *ReqResp, conf.BroadcastBufSize),
-		cch:        make(chan *ReqResp, conf.BroadcastBufSize),
-		hch:        make(chan *ReqResp, conf.HealBufSize),
+		pch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
+		cch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
+		hch:        make(chan *hexatype.ReqResp, conf.HealBufSize),
 		store:      logStore,
 		shutdownCh: make(chan struct{}, 3),
 	}
@@ -135,18 +135,18 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 // Heal returns a readonly channel containing information on keys that need healing.  This
 // is consumed by the client application to take action when unhealthy keys are found in
 // order to repair them.
-func (hlog *Hexalog) Heal() <-chan *ReqResp {
+func (hlog *Hexalog) Heal() <-chan *hexatype.ReqResp {
 	return hlog.hch
 }
 
 // New returns a new Entry to be appended to the log.
-func (hlog *Hexalog) New(key []byte) *Entry {
+func (hlog *Hexalog) New(key []byte) *hexatype.Entry {
 	return hlog.store.NewEntry(key)
 }
 
 // Propose proposes an entry to the log.  It votes on a ballot if it exists or creates one
 // then votes. If required votes has been reach it also moves to the commit phase.
-func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error) {
+func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*Ballot, error) {
 	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			// Only try to heal if the new height is > then the current one
 			if entry.Height > prevHeight {
 
-				hlog.hch <- &ReqResp{
+				hlog.hch <- &hexatype.ReqResp{
 					ID:      id,    // entry hash id
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
@@ -227,7 +227,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			}
 
 			// Broadcast proposal
-			hlog.pch <- &ReqResp{Entry: entry, Options: opts}
+			hlog.pch <- &hexatype.ReqResp{Entry: entry, Options: opts}
 		}
 
 	} else {
@@ -256,7 +256,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			}
 		}
 
-		hlog.pch <- &ReqResp{Entry: entry, Options: opts}
+		hlog.pch <- &hexatype.ReqResp{Entry: entry, Options: opts}
 
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
@@ -290,7 +290,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 }
 
 // Commit tries to commit an already proposed entry to the log.
-func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error) {
+func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*Ballot, error) {
 	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 	"time"
+
+	"github.com/hexablock/hexatype"
 )
 
 func TestNetTransport(t *testing.T) {
@@ -33,7 +35,7 @@ func TestNetTransport(t *testing.T) {
 	<-time.After(50 * time.Millisecond)
 
 	id := entry.Hash(s1.hlog.conf.Hasher.New())
-	e2, err := s1.hlog.trans.GetEntry("127.0.0.1:43212", []byte("testkey"), id, &RequestOptions{})
+	e2, err := s1.hlog.trans.GetEntry("127.0.0.1:43212", []byte("testkey"), id, &hexatype.RequestOptions{})
 	if err != nil {
 		t.Fatalf("key=testkey id=%x %v", id, err)
 	}

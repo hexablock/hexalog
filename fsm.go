@@ -15,7 +15,7 @@ var (
 // using the library. It should return an interface or an error.  The return value is only
 // checked for an error type internally.
 type FSM interface {
-	Apply(entryID []byte, entry *Entry) interface{}
+	Apply(entryID []byte, entry *hexatype.Entry) interface{}
 }
 
 // StableStore is the interface used to store the FSM state.  It contains information about
@@ -31,7 +31,7 @@ type StableStore interface {
 type EchoFSM struct{}
 
 // Apply simply logs the Entry to stdout
-func (fsm *EchoFSM) Apply(entryID []byte, entry *Entry) interface{} {
+func (fsm *EchoFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	log.Printf("[INFO] Applied FSM key=%s id=%x height=%d", entry.Key, entryID, entry.Height)
 	return map[string]string{"status": "ok"}
 }
