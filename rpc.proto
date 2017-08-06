@@ -5,11 +5,11 @@ package hexalog;
 import "github.com/hexablock/hexaring/structs.proto";
 
 service HexalogRPC {
-    rpc ProposeRPC(RPCRequest) returns (RPCResponse) {}
-    rpc CommitRPC(RPCRequest) returns (RPCResponse) {}
-    rpc GetRPC(RPCRequest) returns (RPCResponse) {}
-    rpc TransferKeylogRPC(stream RPCRequest) returns (stream RPCRequest) {}
-    rpc FetchKeylogRPC(stream RPCRequest) returns (stream RPCRequest) {}
+    rpc ProposeRPC(ReqResp) returns (ReqResp) {}
+    rpc CommitRPC(ReqResp) returns (ReqResp) {}
+    rpc GetRPC(ReqResp) returns (ReqResp) {}
+    rpc TransferKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
+    rpc FetchKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
 }
 
 message Entry {
@@ -20,7 +20,8 @@ message Entry {
     bytes Data = 5;
 }
 
-message RPCRequest {
+// Request and response shared structure
+message ReqResp {
     bytes ID = 1;
     Entry Entry = 2;
     RequestOptions Options = 3;
@@ -31,8 +32,4 @@ message RequestOptions {
     int32 SourceIndex = 1;
     // Set of peers for the request.
     repeated hexaring.Location PeerSet = 2;
-}
-
-message RPCResponse {
-    Entry Entry = 1;
 }

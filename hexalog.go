@@ -86,13 +86,13 @@ type Hexalog struct {
 	// to the FSM
 	store LogStore
 	// Propose broadcast channel to broadcast proposals to the network peer set
-	pch chan *RPCRequest
+	pch chan *ReqResp
 	// Commit broadcast channel to broadcast commits to the network peer set
-	cch chan *RPCRequest
+	cch chan *ReqResp
 	// Channel for heal requests.  When previous hash mismatches occur, the log will send a
 	// request down this channel to allow applications to try to recover. This is usually
 	// the case when a keylog falls behind.
-	hch chan *RPCRequest
+	hch chan *ReqResp
 	// Gets set when once a shutdown is signalled
 	shutdown int32
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
@@ -113,9 +113,9 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 		fsm:        ifsm,
 		trans:      trans,
 		ballots:    make(map[string]*Ballot),
-		pch:        make(chan *RPCRequest, conf.BroadcastBufSize),
-		cch:        make(chan *RPCRequest, conf.BroadcastBufSize),
-		hch:        make(chan *RPCRequest, conf.HealBufSize),
+		pch:        make(chan *ReqResp, conf.BroadcastBufSize),
+		cch:        make(chan *ReqResp, conf.BroadcastBufSize),
+		hch:        make(chan *ReqResp, conf.HealBufSize),
 		store:      logStore,
 		shutdownCh: make(chan struct{}, 3),
 	}
@@ -134,7 +134,7 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 // Heal returns a readonly channel containing information on keys that need healing.  This
 // is consumed by the client application to take action when unhealthy keys are found in
 // order to repair them.
-func (hlog *Hexalog) Heal() <-chan *RPCRequest {
+func (hlog *Hexalog) Heal() <-chan *ReqResp {
 	return hlog.hch
 }
 
@@ -171,7 +171,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			// Only try to heal if the new height is > then the current one
 			if entry.Height > prevHeight {
 
-				hlog.hch <- &RPCRequest{
+				hlog.hch <- &ReqResp{
 					ID:      id,    // entry hash id
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
@@ -224,7 +224,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			}
 
 			// Broadcast proposal
-			hlog.pch <- &RPCRequest{Entry: entry, Options: opts}
+			hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 		}
 
 	} else {
@@ -253,7 +253,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 			}
 		}
 
-		hlog.pch <- &RPCRequest{Entry: entry, Options: opts}
+		hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)

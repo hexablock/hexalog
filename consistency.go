@@ -211,7 +211,7 @@ func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
 func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte, entry *Entry, opts *RequestOptions) {
 	if currVotes == 1 {
 		// Broadcast commit entry
-		hlog.cch <- &RPCRequest{Entry: entry, Options: opts}
+		hlog.cch <- &ReqResp{Entry: entry, Options: opts}
 
 	} else if currVotes == hlog.conf.Votes {
 
