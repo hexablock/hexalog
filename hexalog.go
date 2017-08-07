@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -36,17 +35,17 @@ type Transport interface {
 }
 
 // LogStore implements a persistent store for the log
-type LogStore interface {
-	NewKey(key, locationID []byte) (*store.Keylog, error)
-	GetKey(key []byte) (*store.Keylog, error)
-	RemoveKey(key []byte) error
-	NewEntry(key []byte) *hexatype.Entry
-	GetEntry(key, id []byte) (*hexatype.Entry, error)
-	LastEntry(key []byte) *hexatype.Entry
-	Iter(func(key string, locationID []byte))
-	AppendEntry(entry *hexatype.Entry) error
-	RollbackEntry(entry *hexatype.Entry) error
-}
+// type LogStore interface {
+// 	NewKey(key, locationID []byte) (*store.Keylog, error)
+// 	GetKey(key []byte) (*store.Keylog, error)
+// 	RemoveKey(key []byte) error
+// 	NewEntry(key []byte) *hexatype.Entry
+// 	GetEntry(key, id []byte) (*hexatype.Entry, error)
+// 	LastEntry(key []byte) *hexatype.Entry
+// 	Iter(func(key string, locationID []byte))
+// 	AppendEntry(entry *hexatype.Entry) error
+// 	RollbackEntry(entry *hexatype.Entry) error
+// }
 
 // Config holds the configuration for the log.  This is used to initialize the log.
 type Config struct {
@@ -83,7 +82,7 @@ type Hexalog struct {
 	trans Transport
 	// The store containing log entires that are committed, but not necessary applied
 	// to the FSM
-	store LogStore
+	store *LogStore
 	// Currently active ballots
 	mu      sync.RWMutex
 	ballots map[string]*Ballot
@@ -103,7 +102,9 @@ type Hexalog struct {
 }
 
 // NewHexalog initializes a new Hexalog and starts the entry broadcaster
-func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableStore, trans Transport) (*Hexalog, error) {
+func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore StableStore,
+	trans Transport) (*Hexalog, error) {
+
 	// Init internal FSM that manages the user provided application fsm
 	ifsm, err := newFsm(appFSM, stableStore, conf.Hasher)
 	if err != nil {
@@ -118,7 +119,7 @@ func NewHexalog(conf *Config, appFSM FSM, logStore LogStore, stableStore StableS
 		pch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
 		cch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
 		hch:        make(chan *hexatype.ReqResp, conf.HealBufSize),
-		store:      logStore,
+		store:      logstore,
 		shutdownCh: make(chan struct{}, 3),
 	}
 

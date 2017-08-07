@@ -3,13 +3,13 @@ clean:
 	go clean -i ./...
 
 deps:
-	go get -d -v .
+	go get -d -v ./...
 
 test:
-	go test -v -cover .
+	go test -cover ./...
 
 test-race:
-	go test -race .
+	go test -race ./...
 
 protoc:
 	protoc rpc.proto -I ./ -I ../../../ --go_out=plugins=grpc:.

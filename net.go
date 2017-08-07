@@ -11,7 +11,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -396,7 +395,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	}
 
 	// Check for existence of the key locally
-	var keylog *store.Keylog
+	var keylog *Keylog
 	if keylog, err = trans.hlog.store.GetKey(req.Entry.Key); err != nil {
 		if keylog, err = trans.hlog.store.NewKey(req.Entry.Key, req.ID); err != nil {
 			return err

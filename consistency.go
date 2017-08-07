@@ -112,59 +112,6 @@ func (hlog *Hexalog) reapBallotsOnce() (c int) {
 	return
 }
 
-func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
-	// Get self index in the PeerSet.
-	idx, ok := hlog.getSelfIndex(opts.PeerSet)
-	if !ok {
-		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
-	}
-
-	for _, p := range opts.PeerSet {
-		// Do not broadcast to self
-		if p.Vnode.Host == hlog.conf.Hostname {
-			continue
-		}
-
-		host := p.Vnode.Host
-
-		o := opts.CloneWithSourceIndex(int32(idx))
-		log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d",
-			hlog.conf.Hostname, host, o.SourceIndex)
-		if err := hlog.trans.ProposeEntry(host, entry, o); err != nil {
-			return err
-		}
-
-	}
-
-	return nil
-}
-
-func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
-	// Get self index in the PeerSet.
-	idx, ok := hlog.getSelfIndex(opts.PeerSet)
-	if !ok {
-		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
-	}
-
-	for _, p := range opts.PeerSet {
-		// Do not broadcast to self
-		if p.Vnode.Host == hlog.conf.Hostname {
-			continue
-		}
-
-		o := opts.CloneWithSourceIndex(int32(idx))
-		log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname,
-			p.Vnode.Host, o.SourceIndex)
-
-		if err := hlog.trans.CommitEntry(p.Vnode.Host, entry, o); err != nil {
-			return err
-		}
-
-	}
-
-	return nil
-}
-
 // getBallot gets a ballot for a key.  It returns nil if a ballot does not exist
 func (hlog *Hexalog) getBallot(key []byte) *Ballot {
 	hlog.mu.RLock()
@@ -230,6 +177,61 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 		hlog.removeBallot(key)
 	}
 
+}
+
+// broadcastPropose broadcasts proposal entries to all members in the peer set
+func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+	// Get self index in the PeerSet.
+	idx, ok := hlog.getSelfIndex(opts.PeerSet)
+	if !ok {
+		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+	}
+
+	for _, p := range opts.PeerSet {
+		// Do not broadcast to self
+		if p.Vnode.Host == hlog.conf.Hostname {
+			continue
+		}
+
+		host := p.Vnode.Host
+
+		o := opts.CloneWithSourceIndex(int32(idx))
+		log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d",
+			hlog.conf.Hostname, host, o.SourceIndex)
+		if err := hlog.trans.ProposeEntry(host, entry, o); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// broadcastCommit broadcasts the commit entry to all members in the peer set
+func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+	// Get self index in the PeerSet.
+	idx, ok := hlog.getSelfIndex(opts.PeerSet)
+	if !ok {
+		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+	}
+
+	for _, p := range opts.PeerSet {
+		// Do not broadcast to self
+		if p.Vnode.Host == hlog.conf.Hostname {
+			continue
+		}
+
+		o := opts.CloneWithSourceIndex(int32(idx))
+		log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname,
+			p.Vnode.Host, o.SourceIndex)
+
+		if err := hlog.trans.CommitEntry(p.Vnode.Host, entry, o); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
 }
 
 // broadcastCommits starts consuming the commit broadcast channel to broadcast locally

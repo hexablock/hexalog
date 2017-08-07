@@ -1,9 +1,10 @@
-package store
+package hexalog
 
 import (
 	"bytes"
 	"errors"
 
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -12,21 +13,20 @@ var (
 	errNotLastEntry = errors.New("not last entry")
 )
 
-// TODO: move hexalog package
-
-// Keylog implements an in-memory KeylogStore
+// Keylog represents a log for a given key.  It manages operations against log entries for
+// a key.
 type Keylog struct {
 	// Datastore containing entries
-	entries EntryStore
+	entries store.EntryStore
 	// KeylogIndex interface
-	idx KeylogIndex
+	idx store.KeylogIndex
 	// Hash function
 	hasher hexatype.Hasher
 }
 
 // NewKeylog initializes a new log for a key. It takes a key, location id and hash function used
 // to compute hash id's of log entries.
-func NewKeylog(entries EntryStore, idx KeylogIndex, hasher hexatype.Hasher) *Keylog {
+func NewKeylog(entries store.EntryStore, idx store.KeylogIndex, hasher hexatype.Hasher) *Keylog {
 	return &Keylog{
 		hasher:  hasher,
 		entries: entries,

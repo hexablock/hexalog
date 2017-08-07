@@ -59,8 +59,11 @@ func initTestServer(addr string) *testServer {
 	RegisterHexalogRPCServer(server, trans)
 
 	ss := &store.InMemStableStore{}
+
 	es := store.NewInMemEntryStore()
-	ls := store.NewInMemLogStore(es, &hexatype.SHA1Hasher{})
+	is := store.NewInMemIndexStore()
+	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
+
 	hlog, _ := initHexalog(addr, ls, ss, trans)
 
 	go server.Serve(ln)
@@ -68,7 +71,7 @@ func initTestServer(addr string) *testServer {
 	return &testServer{ln: ln, hlog: hlog, s: server}
 }
 
-func initHexalog(host string, ls LogStore, ss StableStore, trans Transport) (*Hexalog, error) {
+func initHexalog(host string, ls *LogStore, ss StableStore, trans Transport) (*Hexalog, error) {
 	conf := DefaultConfig(host)
 	conf.BallotReapInterval = 5 * time.Second
 
