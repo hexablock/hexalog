@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	chord "github.com/hexablock/go-chord"
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
@@ -49,13 +50,6 @@ func (server *testServer) stop() {
 	server.ln.Close()
 }
 
-type MockStableStore struct{}
-
-func (ss *MockStableStore) Open() error                    { return nil }
-func (ss *MockStableStore) Get(key []byte) ([]byte, error) { return nil, nil }
-func (ss *MockStableStore) Set(key, value []byte) error    { return nil }
-func (ss *MockStableStore) Close() error                   { return nil }
-
 func initTestServer(addr string) *testServer {
 	ln, _ := net.Listen("tcp", addr)
 	server := grpc.NewServer()
@@ -64,8 +58,8 @@ func initTestServer(addr string) *testServer {
 	trans := NewNetTransport(500*time.Millisecond, 3*time.Second)
 	RegisterHexalogRPCServer(server, trans)
 
-	ss := &MockStableStore{}
-	ls := NewInMemLogStore(&hexatype.SHA1Hasher{})
+	ss := &store.InMemStableStore{}
+	ls := store.NewInMemLogStore(&hexatype.SHA1Hasher{})
 	hlog, _ := initHexalog(addr, ls, ss, trans)
 
 	go server.Serve(ln)

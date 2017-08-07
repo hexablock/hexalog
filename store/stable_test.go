@@ -1,4 +1,4 @@
-package hexalog
+package store
 
 import (
 	"bytes"
@@ -47,6 +47,10 @@ func TestInMemStableStore(t *testing.T) {
 
 	if err = ss.Close(); err != nil {
 		t.Fatal(err)
+	}
+
+	if _, err = ss.Get([]byte("not-found")); err == nil {
+		t.Fatal("key should not be found")
 	}
 
 	// Re-open  store and check

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func Test_logStore(t *testing.T) {
+func Test_logStore_integration(t *testing.T) {
 	s1 := initTestServer("127.0.0.1:53211")
 	s2 := initTestServer("127.0.0.1:53212")
 	s3 := initTestServer("127.0.0.1:53213")

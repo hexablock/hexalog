@@ -1,7 +1,6 @@
-package hexalog
+package store
 
 import (
-	"errors"
 	"log"
 	"sort"
 	"sync"
@@ -10,24 +9,15 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-var (
-	// ErrEntryNotFound is returned when an entry for a key is not found
-	ErrEntryNotFound = errors.New("entry not found")
-	errKeyNotFound   = errors.New("key not found")
-	errKeyExists     = errors.New("key exists")
-	errKeyInvalid    = errors.New("key invalid")
-)
-
 // KeylogStore implements a storage interface to store logs for a given key
 type KeylogStore interface {
 	LocationID() []byte
-	Height() uint32
+	//Height() uint32
 	Iter(seek []byte, cb func(entry *hexatype.Entry) error) error
 	GetEntry(id []byte) (*hexatype.Entry, error)
 	LastEntry() *hexatype.Entry
 	AppendEntry(entry *hexatype.Entry) error
 	RollbackEntry(entry *hexatype.Entry) (int, error)
-	Entries() []*hexatype.Entry
 }
 
 // InMemLogStore is the whole log containing all keys.  It manages serialization of
@@ -85,7 +75,7 @@ func (hlog *InMemLogStore) GetEntry(key, id []byte) (*hexatype.Entry, error) {
 		return kl.GetEntry(id)
 	}
 
-	return nil, ErrEntryNotFound
+	return nil, hexatype.ErrEntryNotFound
 }
 
 // LastEntry gets the last entry for a key form the log
@@ -111,7 +101,7 @@ func (hlog *InMemLogStore) NewKey(key, locationID []byte) (keylog KeylogStore, e
 		keylog = NewInMemKeylogStore(key, locationID, hlog.hasher)
 		hlog.m[k] = keylog
 	} else {
-		err = errKeyExists
+		err = hexatype.ErrKeyExists
 	}
 	hlog.mu.Unlock()
 
@@ -157,7 +147,7 @@ func (hlog *InMemLogStore) RollbackEntry(entry *hexatype.Entry) error {
 	keylog, ok := hlog.m[key]
 	if !ok {
 		hlog.mu.RUnlock()
-		return errKeyNotFound
+		return hexatype.ErrKeyNotFound
 	}
 	hlog.mu.RUnlock()
 
@@ -184,7 +174,7 @@ func (hlog *InMemLogStore) GetKey(key []byte) (keylog KeylogStore, err error) {
 	defer hlog.mu.RUnlock()
 
 	if keylog, ok = hlog.m[k]; !ok {
-		err = errKeyNotFound
+		err = hexatype.ErrKeyNotFound
 	}
 
 	return
@@ -200,7 +190,7 @@ func (hlog *InMemLogStore) RemoveKey(key []byte) error {
 	}
 	hlog.mu.Unlock()
 
-	return errKeyNotFound
+	return hexatype.ErrKeyNotFound
 }
 
 // AppendEntry appends an entry to a KeyLog.  If the key does not exist it returns an error
@@ -210,7 +200,7 @@ func (hlog *InMemLogStore) AppendEntry(entry *hexatype.Entry) error {
 	hlog.mu.Lock()
 	klog, ok := hlog.m[k]
 	if !ok {
-		return errKeyNotFound
+		return hexatype.ErrKeyNotFound
 	}
 
 	if err := klog.AppendEntry(entry); err != nil {

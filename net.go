@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -274,7 +275,7 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	// Make sure a key is specified in the request
 	if req.Entry == nil || req.Entry.Key == nil || len(req.Entry.Key) == 0 {
 		log.Printf("[ERROR] Invalid entry/key: %#v", req)
-		return errKeyInvalid
+		return hexatype.ErrKeyInvalid
 	}
 
 	// Get the key log
@@ -381,7 +382,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	}
 	if req.Entry == nil || req.Entry.Key == nil || len(req.Entry.Key) == 0 {
 		log.Printf("[ERROR] Invalid entry/key: %#v", req)
-		return errKeyInvalid
+		return hexatype.ErrKeyInvalid
 	}
 
 	// Get the last entry for the key and assemble a new payload.
@@ -395,7 +396,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	}
 
 	// Check for existence of the key locally
-	var keylog KeylogStore
+	var keylog store.KeylogStore
 	if keylog, err = trans.hlog.store.GetKey(req.Entry.Key); err != nil {
 		if keylog, err = trans.hlog.store.NewKey(req.Entry.Key, req.ID); err != nil {
 			return err

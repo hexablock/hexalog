@@ -1,4 +1,4 @@
-package hexalog
+package store
 
 import (
 	"errors"

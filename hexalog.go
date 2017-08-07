@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -36,8 +37,8 @@ type Transport interface {
 
 // LogStore implements a persistent store for the log
 type LogStore interface {
-	NewKey(key, locationID []byte) (KeylogStore, error)
-	GetKey(key []byte) (KeylogStore, error)
+	NewKey(key, locationID []byte) (store.KeylogStore, error)
+	GetKey(key []byte) (store.KeylogStore, error)
 	RemoveKey(key []byte) error
 	NewEntry(key []byte) *hexatype.Entry
 	GetEntry(key, id []byte) (*hexatype.Entry, error)
@@ -184,13 +185,14 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 				// TODO: Get a future and use that instead
 
 				//
-				// TODO: Gate to avoid an infinite retry
+				// TODO: Gate to avoid an infinite retry.  Currently gated by height check.
 				//
 
 				// Retry
 				return hlog.Propose(entry, opts)
 			}
 
+			log.Printf("[DEBUG] Not healing key=%s height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
 		}
 
 		hlog.ballotGetClose(id, err)
