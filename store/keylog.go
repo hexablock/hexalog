@@ -12,64 +12,56 @@ var (
 	errNotLastEntry = errors.New("not last entry")
 )
 
-type keylogBase struct {
-	key []byte
-	// Location id
-	locationID []byte
-	// Hash function used to generate id's
+// TODO: move hexalog package
+
+// Keylog implements an in-memory KeylogStore
+type Keylog struct {
+	// Datastore containing entries
+	entries EntryStore
+	// KeylogIndex interface
+	idx KeylogIndex
+	// Hash function
 	hasher hexatype.Hasher
 }
 
-func (klb *keylogBase) LocationID() []byte {
-	return klb.locationID
-}
-
-func (klb *keylogBase) Key() []byte {
-	return klb.key
-}
-
-// InMemKeylogStore implements an in-memory KeylogStore
-type InMemKeylogStore struct {
-	*keylogBase
-	// Datastore containing entries by id
-	entries EntryStore
-	// Index of entry id's for the key
-	idx KeylogIndex
-}
-
-// NewInMemKeylogStore initializes a new log for a key. It takes a key, location id and hash function used
+// NewKeylog initializes a new log for a key. It takes a key, location id and hash function used
 // to compute hash id's of log entries.
-func NewInMemKeylogStore(key, locationID []byte, hasher hexatype.Hasher) *InMemKeylogStore {
-	return &InMemKeylogStore{
-		keylogBase: &keylogBase{key, locationID, hasher},
-		entries:    NewInMemEntryStore(),
-		idx:        NewInMemKeylogIndex(key, locationID),
+func NewKeylog(entries EntryStore, idx KeylogIndex, hasher hexatype.Hasher) *Keylog {
+	return &Keylog{
+		hasher:  hasher,
+		entries: entries,
+		idx:     idx,
 	}
 }
 
-// LastEntry returns the last entry in the InMemKeylogStore.  If there are no entries in the log ,
-// nil is returned.
-func (keylog *InMemKeylogStore) LastEntry() *hexatype.Entry {
+// LocationID returns the LocationID for the replicated key
+func (keylog *Keylog) LocationID() []byte {
+	return keylog.idx.LocationID()
+}
 
+// LastEntry returns the last entry in the Keylog.  If there are no entries in the log ,
+// nil is returned.
+func (keylog *Keylog) LastEntry() *hexatype.Entry {
+	// Get last id from index
 	lid := keylog.idx.Last()
 	if lid == nil {
 		return nil
 	}
-
+	// Get entry based on id
 	entry, _ := keylog.entries.Get(lid)
 	return entry
 }
 
 // AppendEntry appends an entry to the log.  It returns an error if there is a previous
 // hash mismatch
-func (keylog *InMemKeylogStore) AppendEntry(entry *hexatype.Entry) (err error) {
+func (keylog *Keylog) AppendEntry(entry *hexatype.Entry) (err error) {
 	id := entry.Hash(keylog.hasher.New())
 
 	// Add id to index.  The index will check for order
 	if err = keylog.idx.Append(id, entry.Previous); err != nil {
 		return err
 	}
-
+	// Add entry to store
 	if err = keylog.entries.Set(id, entry); err == nil {
 		log.Printf("[DEBUG] Appended key=%s height=%d id=%x", entry.Key, entry.Height, entry.Hash(keylog.hasher.New()))
 	}
@@ -77,14 +69,14 @@ func (keylog *InMemKeylogStore) AppendEntry(entry *hexatype.Entry) (err error) {
 	return
 }
 
-// GetEntry gets and entry from the InMemKeylogStore
-func (keylog *InMemKeylogStore) GetEntry(id []byte) (*hexatype.Entry, error) {
+// GetEntry gets and entry from the Keylog
+func (keylog *Keylog) GetEntry(id []byte) (*hexatype.Entry, error) {
 	return keylog.entries.Get(id)
 }
 
 // RollbackEntry rolls the keylog back by the entry.  It only rolls back if the entry is
 // the last entry.  It returns the number of entries remaining in the log and/or an error
-func (keylog *InMemKeylogStore) RollbackEntry(entry *hexatype.Entry) (int, error) {
+func (keylog *Keylog) RollbackEntry(entry *hexatype.Entry) (int, error) {
 	// Compute hash id outside of lock
 	id := entry.Hash(keylog.hasher.New())
 
@@ -109,7 +101,7 @@ func (keylog *InMemKeylogStore) RollbackEntry(entry *hexatype.Entry) (int, error
 
 // Iter iterates over entries starting from the seek position.  It iterates over all
 // entries if seek is nil
-func (keylog *InMemKeylogStore) Iter(seek []byte, cb func(entry *hexatype.Entry) error) error {
+func (keylog *Keylog) Iter(seek []byte, cb func(entry *hexatype.Entry) error) error {
 
 	err := keylog.idx.Iter(seek, func(eid []byte) error {
 		entry, er := keylog.entries.Get(eid)

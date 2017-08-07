@@ -9,23 +9,12 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// KeylogStore implements a storage interface to store logs for a given key
-type KeylogStore interface {
-	LocationID() []byte
-	//Height() uint32
-	Iter(seek []byte, cb func(entry *hexatype.Entry) error) error
-	GetEntry(id []byte) (*hexatype.Entry, error)
-	LastEntry() *hexatype.Entry
-	AppendEntry(entry *hexatype.Entry) error
-	RollbackEntry(entry *hexatype.Entry) (int, error)
-}
-
 // InMemLogStore is the whole log containing all keys.  It manages serialization of
 // operations and all validation and checks required therein.
 type InMemLogStore struct {
 	// Actual key log store.
 	mu sync.RWMutex
-	m  map[string]KeylogStore
+	m  map[string]*Keylog
 	// Hash to use when calculating id's
 	hasher hexatype.Hasher
 }
@@ -33,7 +22,7 @@ type InMemLogStore struct {
 // NewInMemLogStore initializes a new in-memory log store
 func NewInMemLogStore(hasher hexatype.Hasher) *InMemLogStore {
 	return &InMemLogStore{
-		m:      make(map[string]KeylogStore),
+		m:      make(map[string]*Keylog),
 		hasher: hasher,
 	}
 }
@@ -93,12 +82,12 @@ func (hlog *InMemLogStore) LastEntry(key []byte) *hexatype.Entry {
 
 // NewKey creates a new keylog for a key with the locationID.  It returns an error if the
 // key already exists
-func (hlog *InMemLogStore) NewKey(key, locationID []byte) (keylog KeylogStore, err error) {
+func (hlog *InMemLogStore) NewKey(key, locationID []byte) (keylog *Keylog, err error) {
 	k := string(key)
 
 	hlog.mu.Lock()
 	if _, ok := hlog.m[k]; !ok {
-		keylog = NewInMemKeylogStore(key, locationID, hlog.hasher)
+		keylog = NewKeylog(NewInMemEntryStore(), NewInMemKeylogIndex(key, locationID), hlog.hasher)
 		hlog.m[k] = keylog
 	} else {
 		err = hexatype.ErrKeyExists
@@ -164,7 +153,7 @@ func (hlog *InMemLogStore) RollbackEntry(entry *hexatype.Entry) error {
 }
 
 // GetKey returns the log for the given key
-func (hlog *InMemLogStore) GetKey(key []byte) (keylog KeylogStore, err error) {
+func (hlog *InMemLogStore) GetKey(key []byte) (keylog *Keylog, err error) {
 	var (
 		k  = string(key)
 		ok bool

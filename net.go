@@ -396,7 +396,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	}
 
 	// Check for existence of the key locally
-	var keylog store.KeylogStore
+	var keylog *store.Keylog
 	if keylog, err = trans.hlog.store.GetKey(req.Entry.Key); err != nil {
 		if keylog, err = trans.hlog.store.NewKey(req.Entry.Key, req.ID); err != nil {
 			return err

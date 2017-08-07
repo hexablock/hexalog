@@ -8,6 +8,7 @@ import (
 
 // KeylogIndex is the the index interface for a keylog
 type KeylogIndex interface {
+	LocationID() []byte
 	Append(id, prev []byte) error
 	Rollback() int
 	Last() []byte
@@ -22,10 +23,16 @@ type InMemKeylogIndex struct {
 	idx *hexatype.KeylogIndex
 }
 
+// NewInMemKeylogIndex instantiates a new in-memory KeylogIndex
 func NewInMemKeylogIndex(key, locID []byte) *InMemKeylogIndex {
 	return &InMemKeylogIndex{idx: hexatype.NewKeylogIndex(key, locID)}
 }
 
+func (idx *InMemKeylogIndex) LocationID() []byte {
+	return idx.idx.Location
+}
+
+// Append appends the id to the index checking the previous hash.
 func (idx *InMemKeylogIndex) Append(id, prev []byte) error {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()

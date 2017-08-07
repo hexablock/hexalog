@@ -37,8 +37,8 @@ type Transport interface {
 
 // LogStore implements a persistent store for the log
 type LogStore interface {
-	NewKey(key, locationID []byte) (store.KeylogStore, error)
-	GetKey(key []byte) (store.KeylogStore, error)
+	NewKey(key, locationID []byte) (*store.Keylog, error)
+	GetKey(key []byte) (*store.Keylog, error)
 	RemoveKey(key []byte) error
 	NewEntry(key []byte) *hexatype.Entry
 	GetEntry(key, id []byte) (*hexatype.Entry, error)
@@ -81,12 +81,12 @@ type Hexalog struct {
 	fsm *fsm
 	// Underlying transport
 	trans Transport
-	// Currently active ballots
-	mu      sync.RWMutex
-	ballots map[string]*Ballot
 	// The store containing log entires that are committed, but not necessary applied
 	// to the FSM
 	store LogStore
+	// Currently active ballots
+	mu      sync.RWMutex
+	ballots map[string]*Ballot
 	// Propose broadcast channel to broadcast proposals to the network peer set
 	pch chan *hexatype.ReqResp
 	// Commit broadcast channel to broadcast commits to the network peer set
