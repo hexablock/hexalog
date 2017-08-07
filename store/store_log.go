@@ -17,13 +17,16 @@ type InMemLogStore struct {
 	m  map[string]*Keylog
 	// Hash to use when calculating id's
 	hasher hexatype.Hasher
+	// Entry datastore
+	entries EntryStore
 }
 
 // NewInMemLogStore initializes a new in-memory log store
-func NewInMemLogStore(hasher hexatype.Hasher) *InMemLogStore {
+func NewInMemLogStore(entries EntryStore, hasher hexatype.Hasher) *InMemLogStore {
 	return &InMemLogStore{
-		m:      make(map[string]*Keylog),
-		hasher: hasher,
+		m:       make(map[string]*Keylog),
+		hasher:  hasher,
+		entries: entries,
 	}
 }
 
@@ -87,7 +90,7 @@ func (hlog *InMemLogStore) NewKey(key, locationID []byte) (keylog *Keylog, err e
 
 	hlog.mu.Lock()
 	if _, ok := hlog.m[k]; !ok {
-		keylog = NewKeylog(NewInMemEntryStore(), NewInMemKeylogIndex(key, locationID), hlog.hasher)
+		keylog = NewKeylog(hlog.entries, NewInMemKeylogIndex(key, locationID), hlog.hasher)
 		hlog.m[k] = keylog
 	} else {
 		err = hexatype.ErrKeyExists

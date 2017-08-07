@@ -59,7 +59,8 @@ func initTestServer(addr string) *testServer {
 	RegisterHexalogRPCServer(server, trans)
 
 	ss := &store.InMemStableStore{}
-	ls := store.NewInMemLogStore(&hexatype.SHA1Hasher{})
+	es := store.NewInMemEntryStore()
+	ls := store.NewInMemLogStore(es, &hexatype.SHA1Hasher{})
 	hlog, _ := initHexalog(addr, ls, ss, trans)
 
 	go server.Serve(ln)
