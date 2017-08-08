@@ -11,6 +11,8 @@ type EntryStore interface {
 	Get(id []byte) (*hexatype.Entry, error)
 	Set(id []byte, entry *hexatype.Entry) error
 	Delete(id []byte) error
+	// Return the number of entries in the store
+	Count() int
 }
 
 // InMemEntryStore is an in-memory implementation of an EntryStore
@@ -32,6 +34,7 @@ func (store *InMemEntryStore) Get(id []byte) (*hexatype.Entry, error) {
 	if v, ok := store.m[string(id)]; ok {
 		return v, nil
 	}
+
 	return nil, hexatype.ErrEntryNotFound
 }
 
@@ -57,4 +60,11 @@ func (store *InMemEntryStore) Delete(id []byte) error {
 	}
 
 	return hexatype.ErrEntryNotFound
+}
+
+func (store *InMemEntryStore) Count() int {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	return len(store.m)
 }

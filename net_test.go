@@ -45,6 +45,10 @@ func TestNetTransport(t *testing.T) {
 		t.Error("id mismatch")
 	}
 
+	if _, err = s3.hlog.store.GetEntry(entry.Key, id); err != nil {
+		t.Fatal(err)
+	}
+
 	if err = s1.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("testkey")); err != nil {
 		t.Fatal(err)
 	}

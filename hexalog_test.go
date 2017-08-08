@@ -79,7 +79,8 @@ func initHexalog(host string, ls *LogStore, ss StableStore, trans Transport) (*H
 }
 
 func TestMain(m *testing.M) {
-	log.SetLevel("INFO")
+	log.SetLevel("DEBUG")
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	os.Exit(m.Run())
 }
 

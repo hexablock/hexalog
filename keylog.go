@@ -57,14 +57,20 @@ func (keylog *Keylog) LastEntry() *hexatype.Entry {
 func (keylog *Keylog) AppendEntry(entry *hexatype.Entry) (err error) {
 	id := entry.Hash(keylog.hasher.New())
 
-	// Add id to index.  The index will check for order
-	if err = keylog.idx.Append(id, entry.Previous); err != nil {
-		return err
+	if err = keylog.entries.Set(id, entry); err != nil {
+		return
 	}
-	// Add entry to store
-	if err = keylog.entries.Set(id, entry); err == nil {
-		log.Printf("[DEBUG] Appended key=%s height=%d id=%x", entry.Key, entry.Height, entry.Hash(keylog.hasher.New()))
+
+	// Add id to index.  The index will check for order based on the supplied previous.  We
+	// do not rollback the above entry from the entry store on error as only entries in the
+	// index matter.
+	if err = keylog.idx.Append(id, entry.Previous); err == nil {
+		log.Printf("[INFO] Appended key=%s height=%d id=%x", entry.Key, entry.Height, entry.Hash(keylog.hasher.New()))
 	}
+
+	//
+	// TODO: Cleanup residual entries via some deferred process
+	//
 
 	return
 }
@@ -75,15 +81,16 @@ func (keylog *Keylog) GetEntry(id []byte) (*hexatype.Entry, error) {
 }
 
 // RollbackEntry rolls the keylog back by the entry.  It only rolls back if the entry is
-// the last entry.  It returns the number of entries remaining in the log and/or an error
+// the last entry.  It returns the number of entries remaining in the log and any errors
+// occurred
 func (keylog *Keylog) RollbackEntry(entry *hexatype.Entry) (int, error) {
 	// Compute hash id outside of lock
 	id := entry.Hash(keylog.hasher.New())
 
 	lid := keylog.idx.Last()
 	if lid == nil {
-		// Return 0 entry count
-		return 0, hexatype.ErrEntryNotFound
+		// Return current entry with the error
+		return keylog.idx.Count(), hexatype.ErrEntryNotFound
 	}
 
 	if bytes.Compare(id, lid) != 0 {
@@ -101,12 +108,12 @@ func (keylog *Keylog) RollbackEntry(entry *hexatype.Entry) (int, error) {
 
 // Iter iterates over entries starting from the seek position.  It iterates over all
 // entries if seek is nil
-func (keylog *Keylog) Iter(seek []byte, cb func(entry *hexatype.Entry) error) error {
+func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry) error) error {
 
 	err := keylog.idx.Iter(seek, func(eid []byte) error {
 		entry, er := keylog.entries.Get(eid)
 		if er == nil {
-			er = cb(entry)
+			er = cb(eid, entry)
 		}
 		return er
 	})

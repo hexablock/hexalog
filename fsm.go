@@ -97,10 +97,8 @@ func (fsm *fsm) startApply() {
 				data = resp
 			}
 		}
-
 		// Commit the last fsm applied entry to stable store
 		e2 := fsm.ss.Set(entry.Key, entry.Hash(fsm.hasher.New()))
-
 		// Signal future that we applied the entry supplying the app fsm response or any errors
 		// encountered
 		fentry.applied(data, mergeErrors(e1, e2))

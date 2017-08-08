@@ -108,44 +108,38 @@ func (hlog *LogStore) RollbackEntry(entry *hexatype.Entry) error {
 // GetKey returns the log for the given key
 func (hlog *LogStore) GetKey(key []byte) (keylog *Keylog, err error) {
 	idx, err := hlog.index.GetKey(key)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return NewKeylog(hlog.entries, idx, hlog.hasher), nil
 	}
 
-	return NewKeylog(hlog.entries, idx, hlog.hasher), nil
+	return nil, err
 }
 
 // RemoveKey marks a key log to be removed.  It is actually removed during compaction
 func (hlog *LogStore) RemoveKey(key []byte) error {
-	// keylog, err := hlog.GetKey(key)
-	// if err != nil {
-	// 	return err
-	// }
-	err := hlog.index.RemoveKey(key)
-	//
-	// TODO: Schedule removal of all key entries
-	//
+	keylog, err := hlog.GetKey(key)
+	if err != nil {
+		return err
+	}
+
+	if err = hlog.index.RemoveKey(key); err == nil {
+		err = keylog.Iter(nil, func(id []byte, entry *hexatype.Entry) error {
+			//
+			// TODO: Schedule removal of all log entries for the key
+			//
+			return nil
+		})
+	}
+
 	return err
 }
 
 // AppendEntry appends an entry to a KeyLog.  If the key does not exist it returns an error
 func (hlog *LogStore) AppendEntry(entry *hexatype.Entry) error {
-
-	kl, err := hlog.GetKey(entry.Key)
-	if err != nil {
-		return err
+	keylog, err := hlog.GetKey(entry.Key)
+	if err == nil {
+		return keylog.AppendEntry(entry)
 	}
-
-	id := entry.Hash(hlog.hasher.New())
-	if err = hlog.entries.Set(id, entry); err != nil {
-		return err
-	}
-
-	if err = kl.AppendEntry(entry); err != nil {
-		// rollback
-		hlog.entries.Delete(id)
-	}
-
 	return err
 }
 

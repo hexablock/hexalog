@@ -223,11 +223,10 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry) (*Fut
 	// Only generate an id for the entry if the previous hash is not nil.  Remote assumes
 	// all log entries if the request id is nil
 	if entry.Previous != nil {
-		h := trans.hlog.conf.Hasher.New()
-		req.ID = entry.Hash(h)
+		req.ID = entry.Hash(trans.hlog.conf.Hasher.New())
 	}
 
-	log.Printf("[DEBUG] Fetching host=%s key=%s height=%d", host, entry.Key, entry.Height)
+	log.Printf("[DEBUG] Fetching host=%s key=%s height=%d prev=%x", host, entry.Key, entry.Height, entry.Previous)
 	if err = stream.Send(req); err != nil {
 		return nil, err
 	}
@@ -244,6 +243,7 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry) (*Fut
 			}
 			break
 		}
+
 		//
 		// TODO: validate
 		//
@@ -252,8 +252,6 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry) (*Fut
 		if _, err = trans.hlog.store.GetEntry(msg.Entry.Key, msg.ID); err == nil {
 			continue
 		}
-
-		//log.Printf("GOT key=%s id=%x", msg.Entry.Key, msg.ID)
 
 		if fentry, err = trans.hlog.append(msg.ID, msg.Entry); err != nil {
 			log.Printf("[ERROR] Fetch key entry key=%s height=%d error='%v'", entry.Key, entry.Height, err)
@@ -285,16 +283,14 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 
 	// Get the seek position from the request id.  If it is nil assume all log entries need
 	// to be sent
-	h := trans.hlog.conf.Hasher.New()
 	var seek []byte
 	if req.ID != nil {
 		seek = req.ID
 	}
 
+	log.Printf("[DEBUG] Fetch seek=%x", seek)
 	// Start sending entries starting from the id in the request
-	err = keylog.Iter(seek, func(entry *hexatype.Entry) error {
-		h.Reset()
-		id := entry.Hash(h)
+	err = keylog.Iter(seek, func(id []byte, entry *hexatype.Entry) error {
 		resp := &hexatype.ReqResp{Entry: entry, ID: id}
 		log.Printf("[DEBUG] Sending entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
 		return stream.Send(resp)
@@ -345,17 +341,15 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte) error {
 		return err
 	}
 
-	// Get the seek position based on last entry sent from remove
-	h := trans.hlog.conf.Hasher.New()
+	// Get the seek position based on last entry sent from remote
 	var seek []byte
 	if preamble.Entry != nil {
-		seek = preamble.Entry.Hash(h)
+		seek = preamble.Entry.Hash(trans.hlog.conf.Hasher.New())
 	}
 	// Iterate based on seek position
-	err = keylog.Iter(seek, func(entry *hexatype.Entry) error {
-		h.Reset()
+	err = keylog.Iter(seek, func(id []byte, entry *hexatype.Entry) error {
 		// Send entry
-		req := &hexatype.ReqResp{ID: entry.Hash(h), Entry: entry}
+		req := &hexatype.ReqResp{ID: id, Entry: entry}
 		if err = stream.Send(req); err != nil {
 			return err
 		}

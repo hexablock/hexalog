@@ -34,19 +34,6 @@ type Transport interface {
 	Shutdown()
 }
 
-// LogStore implements a persistent store for the log
-// type LogStore interface {
-// 	NewKey(key, locationID []byte) (*store.Keylog, error)
-// 	GetKey(key []byte) (*store.Keylog, error)
-// 	RemoveKey(key []byte) error
-// 	NewEntry(key []byte) *hexatype.Entry
-// 	GetEntry(key, id []byte) (*hexatype.Entry, error)
-// 	LastEntry(key []byte) *hexatype.Entry
-// 	Iter(func(key string, locationID []byte))
-// 	AppendEntry(entry *hexatype.Entry) error
-// 	RollbackEntry(entry *hexatype.Entry) error
-// }
-
 // Config holds the configuration for the log.  This is used to initialize the log.
 type Config struct {
 	Hostname           string
@@ -179,21 +166,23 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
 				}
-
-				// ?? We return here to allow a retry
-				// ?? return nil, err
-
-				// TODO: Get a future and use that instead
-
 				//
 				// TODO: Gate to avoid an infinite retry.  Currently gated by height check.
 				//
 
-				// Retry
+				// Retry propose request
 				return hlog.Propose(entry, opts)
+			} else if entry.Height == prevHeight {
+				log.Printf("[TODO] Heal same height entries key=%s height=%d", entry.Key, entry.Height)
+
+				//
+				// TODO: deep reconciliation
+				//
+
+			} else {
+				log.Printf("[DEBUG] Not healing key=%s height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
 			}
 
-			log.Printf("[DEBUG] Not healing key=%s height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
 		}
 
 		hlog.ballotGetClose(id, err)
@@ -263,18 +252,13 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
-
-		// if err = hlog.store.AppendEntry(entry); err != nil {
-		// 	ballot.close(err)
-		// 	return ballot, err
-		// }
-
 		// Start local commit phase.  We use our index as the voter
 		var cvotes int
 		cvotes, err = ballot.voteCommit(id, string(opts.PeerSet[idx].Vnode.Id))
 		if err == nil {
 
-			// Take action if we have the required commits
+			// Take action if we have the required commits by appending the log entry and calling
+			// app fsm.Apply
 			hlog.checkCommitAndAct(cvotes, ballot, id, entry, opts)
 
 		} else {
@@ -312,7 +296,7 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 	}
 
 	//
-	// TODO: Validate
+	// TODO: Verify & Validate
 	//
 
 	//

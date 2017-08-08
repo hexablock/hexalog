@@ -3,9 +3,55 @@ package hexalog
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"testing"
 	"time"
+
+	"github.com/hexablock/hexalog/store"
+	"github.com/hexablock/hexatype"
 )
+
+func newEntry(ls *LogStore, key string) error {
+	k := []byte(key)
+	ent := ls.NewEntry(k)
+	ent.Data = k
+	return ls.AppendEntry(ent)
+}
+
+func TestLogStore(t *testing.T) {
+	es := store.NewInMemEntryStore()
+	is := store.NewInMemIndexStore()
+	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
+
+	kl, err := ls.NewKey([]byte("key"), []byte("locationID"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	nent := ls.NewEntry([]byte("key"))
+	if len(nent.Previous) == 0 {
+		t.Fatal("prev should not be empty")
+	}
+	for _, v := range nent.Previous {
+		if v != 0 {
+			t.Fatal("shoulde be a zero hash")
+		}
+	}
+
+	for i := 0; i < 3; i++ {
+		if err := newEntry(ls, "key"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if kl.idx.Count() != 3 {
+		t.Fatal("should have 3 entries for key index")
+	}
+
+	if kl.entries.Count() != 3 {
+		t.Fatal("should have 3 entries")
+	}
+}
 
 func Test_logStore_integration(t *testing.T) {
 	s1 := initTestServer("127.0.0.1:53211")
