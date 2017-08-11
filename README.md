@@ -9,4 +9,4 @@ come to consensus.
 ### Roadmap
 
 - Persistence
-- Entry signing & verification
+- Signing & verification

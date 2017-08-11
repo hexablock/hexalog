@@ -120,3 +120,12 @@ func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry
 
 	return err
 }
+
+// GetIndex returns a hexatype.KeylogIndex struct
+func (keylog *Keylog) GetIndex() *hexatype.KeylogIndex {
+	return keylog.idx.Index()
+}
+
+// func (keylog Keylog) MarshalJSON() ([]byte, error) {
+// 	return json.Marshal(keylog.idx)
+// }

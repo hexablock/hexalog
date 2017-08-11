@@ -173,7 +173,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 				// Retry propose request
 				return hlog.Propose(entry, opts)
 			} else if entry.Height == prevHeight {
-				log.Printf("[TODO] Heal same height entries key=%s height=%d", entry.Key, entry.Height)
+				log.Printf("[TODO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
 
 				//
 				// TODO: deep reconciliation

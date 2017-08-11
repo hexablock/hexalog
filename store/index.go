@@ -33,8 +33,11 @@ type KeylogIndex interface {
 	Iter(seek []byte, cb func(id []byte) error) error
 	// Number of entries
 	Count() int
+	// Index object
+	Index() *hexatype.KeylogIndex
 }
 
+// InMemIndexStore implements an in-memory KeylogIndex store interface
 type InMemIndexStore struct {
 	mu sync.RWMutex
 	m  map[string]KeylogIndex
@@ -109,7 +112,7 @@ func (store *InMemIndexStore) sortedKeys() []string {
 	return keys
 }
 
-// InMemKeylogIndex implements an in memory KeylogIndex.  It simply wraps the
+// InMemKeylogIndex implements an in-memory KeylogIndex interface.  It simply wraps the
 // hexatype.KeylogIndex with a mutex
 type InMemKeylogIndex struct {
 	mu  sync.RWMutex
@@ -148,14 +151,23 @@ func (idx *InMemKeylogIndex) Last() []byte {
 	return idx.idx.Last()
 }
 
+// Iter iterates over each entry id in the index
 func (idx *InMemKeylogIndex) Iter(seek []byte, cb func(id []byte) error) error {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	return idx.idx.Iter(seek, cb)
 }
 
+// Count returns the number of entries in the index
 func (idx *InMemKeylogIndex) Count() int {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	return idx.idx.Count()
+}
+
+// Index returns the KeylogIndex index struct
+func (idx *InMemKeylogIndex) Index() *hexatype.KeylogIndex {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.idx
 }

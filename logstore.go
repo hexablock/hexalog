@@ -1,11 +1,11 @@
 package hexalog
 
 import (
-	"log"
 	"time"
 
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
 
 // LogStore is the whole log containing all keys.  It manages serialization of
