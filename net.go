@@ -27,7 +27,7 @@ type NetTransport struct {
 	hlog *Hexalog
 
 	mu   sync.RWMutex
-	pool map[string][]*rpcOutConn
+	pool map[string]*rpcOutConn
 
 	maxConnIdle  time.Duration
 	reapInterval time.Duration
@@ -38,7 +38,7 @@ type NetTransport struct {
 // NewNetTransport initializes a NetTransport with an outbound connection pool.
 func NewNetTransport(reapInterval, maxConnIdle time.Duration) *NetTransport {
 	trans := &NetTransport{
-		pool:         make(map[string][]*rpcOutConn),
+		pool:         make(map[string]*rpcOutConn),
 		maxConnIdle:  maxConnIdle,
 		reapInterval: reapInterval,
 	}
@@ -99,31 +99,30 @@ func (trans *NetTransport) getConn(host string) (*rpcOutConn, error) {
 		return nil, fmt.Errorf("transport is shutdown")
 	}
 
-	// Check if we have a conn cached
-	var out *rpcOutConn
-	trans.mu.Lock()
-	list, ok := trans.pool[host]
-	if ok && len(list) > 0 {
-		out = list[len(list)-1]
-		list = list[:len(list)-1]
-		trans.pool[host] = list
+	trans.mu.RLock()
+	if out, ok := trans.pool[host]; ok && out != nil {
+		defer trans.mu.RUnlock()
+		return out, nil
 	}
-	trans.mu.Unlock()
-	// Make a new connection
-	if out == nil {
-		conn, err := grpc.Dial(host, grpc.WithInsecure())
-		if err == nil {
-			return &rpcOutConn{
-				host:   host,
-				client: NewHexalogRPCClient(conn),
-				conn:   conn,
-				used:   time.Now(),
-			}, nil
-		}
+	trans.mu.RUnlock()
+
+	conn, err := grpc.Dial(host, grpc.WithInsecure())
+	if err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	// Make a new connection
+	trans.mu.Lock()
+	out := &rpcOutConn{
+		host:   host,
+		client: NewHexalogRPCClient(conn),
+		conn:   conn,
+		used:   time.Now(),
+	}
+	trans.pool[host] = out
+	trans.mu.Unlock()
+
+	return out, err
 }
 
 func (trans *NetTransport) returnConn(o *rpcOutConn) {
@@ -137,8 +136,7 @@ func (trans *NetTransport) returnConn(o *rpcOutConn) {
 
 	// Push back into the pool
 	trans.mu.Lock()
-	list, _ := trans.pool[o.host]
-	trans.pool[o.host] = append(list, o)
+	trans.pool[o.host] = o
 	trans.mu.Unlock()
 }
 
@@ -154,21 +152,12 @@ func (trans *NetTransport) reapOld() {
 
 func (trans *NetTransport) reapOnce() {
 	trans.mu.Lock()
-
 	for host, conns := range trans.pool {
-		max := len(conns)
-		for i := 0; i < max; i++ {
-			if time.Since(conns[i].used) > trans.maxConnIdle {
-				conns[i].conn.Close()
-				conns[i], conns[max-1] = conns[max-1], nil
-				max--
-				i--
-			}
+		if time.Since(conns.used) > trans.maxConnIdle {
+			conns.conn.Close()
+			delete(trans.pool, host)
 		}
-		// Trim any idle conns
-		trans.pool[host] = conns[:max]
 	}
-
 	trans.mu.Unlock()
 }
 
@@ -441,10 +430,10 @@ func (trans *NetTransport) Shutdown() {
 	atomic.StoreInt32(&trans.shutdown, 1)
 
 	trans.mu.Lock()
-	for _, arr := range trans.pool {
-		for _, v := range arr {
-			v.conn.Close()
-		}
+	for _, conn := range trans.pool {
+		//for _, v := range arr {
+		conn.conn.Close()
+		//}
 	}
 	trans.pool = nil
 	trans.mu.Unlock()
