@@ -8,6 +8,7 @@ service HexalogRPC {
     rpc ProposeRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
     rpc CommitRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
     rpc GetRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
+    rpc LastRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
     rpc TransferKeylogRPC(stream hexatype.ReqResp) returns (stream hexatype.ReqResp) {}
     rpc FetchKeylogRPC(stream hexatype.ReqResp) returns (stream hexatype.ReqResp) {}
 }

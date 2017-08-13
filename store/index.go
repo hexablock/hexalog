@@ -7,42 +7,13 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// IndexStore implements a KeylogIndex datastore
-type IndexStore interface {
-	// Create a new KeylogIndex and add it to the store.
-	NewKey(key, locationID []byte) (KeylogIndex, error)
-	// Get a KeylogIndex from the store
-	GetKey(key []byte) (KeylogIndex, error)
-	// Remove key if exists or return an error
-	RemoveKey(key []byte) error
-	// Iterate over each key and associated location id
-	Iter(cb func(key string, locID []byte))
-}
-
-// KeylogIndex is the the index interface for a keylog
-type KeylogIndex interface {
-	// Returns location id for the key
-	LocationID() []byte
-	// Append id checking previous is equal to prev
-	Append(id, prev []byte) error
-	// Remove last entry
-	Rollback() int
-	// Last entry id
-	Last() []byte
-	// Iterate each entry id issuing the callback for each bailing on error
-	Iter(seek []byte, cb func(id []byte) error) error
-	// Number of entries
-	Count() int
-	// Index object
-	Index() *hexatype.KeylogIndex
-}
-
 // InMemIndexStore implements an in-memory KeylogIndex store interface
 type InMemIndexStore struct {
 	mu sync.RWMutex
 	m  map[string]KeylogIndex
 }
 
+// NewInMemIndexStore initializes an in-memory store for KeylogIndexes.
 func NewInMemIndexStore() *InMemIndexStore {
 	return &InMemIndexStore{m: make(map[string]KeylogIndex)}
 }
@@ -77,6 +48,8 @@ func (store *InMemIndexStore) GetKey(key []byte) (KeylogIndex, error) {
 	return nil, hexatype.ErrKeyNotFound
 }
 
+// RemoveKey removes the given key's index from the store.  It does NOT remove the associated
+// entry hash id's
 func (store *InMemIndexStore) RemoveKey(key []byte) error {
 	k := string(key)
 
@@ -90,6 +63,8 @@ func (store *InMemIndexStore) RemoveKey(key []byte) error {
 	return hexatype.ErrKeyNotFound
 }
 
+// Iter iterates over each key in lexographical order issuing the callback with the key
+// and location id.
 func (store *InMemIndexStore) Iter(cb func(string, []byte)) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
@@ -165,9 +140,9 @@ func (idx *InMemKeylogIndex) Count() int {
 	return idx.idx.Count()
 }
 
-// Index returns the KeylogIndex index struct
-func (idx *InMemKeylogIndex) Index() *hexatype.KeylogIndex {
+// Index returns the KeylogIndex index struct.  It is meant be used as readonly
+func (idx *InMemKeylogIndex) Index() hexatype.KeylogIndex {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
-	return idx.idx
+	return *idx.idx
 }

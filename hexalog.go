@@ -1,7 +1,6 @@
 package hexalog
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -11,15 +10,12 @@ import (
 	"github.com/hexablock/log"
 )
 
-var (
-	errInsufficientPeers = errors.New("insufficient peers")
-	errPreviousHash      = errors.New("previous hash mismatch")
-)
-
 // Transport implements a Hexalog network transport
 type Transport interface {
 	// Gets an entry from a remote host
 	GetEntry(host string, key, id []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error)
+	// Get last entry for the key
+	LastEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error)
 	// Proposes an entry on the remote host
 	ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Commits an entry on the remote host
@@ -157,21 +153,23 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 	// This will be errPreviousHash
 	if err != nil {
 
-		if err == errPreviousHash {
-			// Only try to heal if the new height is > then the current one
-			if entry.Height > prevHeight {
+		if err == hexatype.ErrPreviousHash {
 
+			if entry.Height > prevHeight {
+				// Only try to heal if the new height is > then the current one
 				hlog.hch <- &hexatype.ReqResp{
 					ID:      id,    // entry hash id
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
 				}
+
 				//
-				// TODO: Gate to avoid an infinite retry.  Currently gated by height check.
+				// TODO: Gate to avoid an infinite retry.  Currently gated only by height check.
 				//
 
 				// Retry propose request
-				return hlog.Propose(entry, opts)
+				//return hlog.Propose(entry, opts)
+
 			} else if entry.Height == prevHeight {
 				log.Printf("[TODO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
 
@@ -180,7 +178,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 				//
 
 			} else {
-				log.Printf("[DEBUG] Not healing key=%s height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
+				log.Printf("[DEBUG] Not healing key=%s curr-height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
 			}
 
 		}

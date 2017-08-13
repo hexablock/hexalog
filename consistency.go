@@ -55,7 +55,7 @@ func (hlog *Hexalog) verifyEntry(entry *hexatype.Entry) (prevHeight uint32, err 
 
 	// Check the previous hash
 	if bytes.Compare(entry.Previous, lastID) != 0 {
-		err = errPreviousHash
+		err = hexatype.ErrPreviousHash
 	}
 
 	return
@@ -132,7 +132,7 @@ func (hlog *Hexalog) removeBallot(key []byte) {
 
 func (hlog *Hexalog) checkOptions(opts *hexatype.RequestOptions) error {
 	if opts.PeerSet == nil || len(opts.PeerSet) < hlog.conf.Votes {
-		return errInsufficientPeers
+		return hexatype.ErrInsufficientPeers
 	}
 
 	return nil
@@ -179,6 +179,29 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 
 }
 
+// sendProposal makes a single proposal request to a location.  if a hexatype.ErrPreviousHash
+// error is returned a  heal request is submitted
+func (hlog *Hexalog) sendProposal(entry *hexatype.Entry, loc *hexaring.Location, idx int, opts *hexatype.RequestOptions) error {
+	host := loc.Vnode.Host
+	o := opts.CloneWithSourceIndex(int32(idx))
+
+	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
+	err := hlog.trans.ProposeEntry(host, entry, o)
+
+	switch err {
+	case hexatype.ErrPreviousHash:
+		hlog.hch <- &hexatype.ReqResp{
+			Options: opts,
+			Entry:   entry,
+		}
+
+		log.Printf("[DEBUG] Healing from sending proposal key=%s height=%d", entry.Key, entry.Height)
+
+	}
+
+	return err
+}
+
 // broadcastPropose broadcasts proposal entries to all members in the peer set
 func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	// Get self index in the PeerSet.
@@ -193,18 +216,32 @@ func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.Requ
 			continue
 		}
 
-		host := p.Vnode.Host
-
-		o := opts.CloneWithSourceIndex(int32(idx))
-		log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d",
-			hlog.conf.Hostname, host, o.SourceIndex)
-		if err := hlog.trans.ProposeEntry(host, entry, o); err != nil {
+		if err := hlog.sendProposal(entry, p, idx, opts); err != nil {
 			return err
 		}
 
 	}
 
 	return nil
+}
+
+// broadcastProposals starts consuming the proposal broadcast channel to broadcast
+// locally proposed entries to the network.  This is mean to be run in a go-routine.
+func (hlog *Hexalog) broadcastProposals() {
+	for msg := range hlog.pch {
+
+		if err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
+
+			id := msg.Entry.Hash(hlog.conf.Hasher.New())
+			hlog.ballotGetClose(id, err)
+
+		}
+
+	}
+
+	log.Println("[INFO] Proposal broadcaster shutdown!")
+	// Notify that we have shutdown
+	hlog.shutdownCh <- struct{}{}
 }
 
 // broadcastCommit broadcasts the commit entry to all members in the peer set
@@ -258,25 +295,6 @@ func (hlog *Hexalog) broadcastCommits() {
 	}
 
 	log.Println("[INFO] Commit broadcaster shutdown!")
-	// Notify that we have shutdown
-	hlog.shutdownCh <- struct{}{}
-}
-
-// broadcastProposals starts consuming the proposal broadcast channel to broadcast
-// locally proposed entries to the network.  This is mean to be run in a go-routine.
-func (hlog *Hexalog) broadcastProposals() {
-	for msg := range hlog.pch {
-
-		if err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
-
-			id := msg.Entry.Hash(hlog.conf.Hasher.New())
-			hlog.ballotGetClose(id, err)
-
-		}
-
-	}
-
-	log.Println("[INFO] Proposal broadcaster shutdown!")
 	// Notify that we have shutdown
 	hlog.shutdownCh <- struct{}{}
 }

@@ -6,15 +6,6 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// EntryStore implements a datastore for log entries.
-type EntryStore interface {
-	Get(id []byte) (*hexatype.Entry, error)
-	Set(id []byte, entry *hexatype.Entry) error
-	Delete(id []byte) error
-	// Return the number of entries in the store
-	Count() int
-}
-
 // InMemEntryStore is an in-memory implementation of an EntryStore
 type InMemEntryStore struct {
 	mu sync.RWMutex
@@ -62,6 +53,7 @@ func (store *InMemEntryStore) Delete(id []byte) error {
 	return hexatype.ErrEntryNotFound
 }
 
+// Count returns the number of entries currently in the store.
 func (store *InMemEntryStore) Count() int {
 	store.mu.RLock()
 	defer store.mu.RUnlock()

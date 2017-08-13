@@ -15,7 +15,8 @@ type InMemStableStore struct {
 	m  map[string][]byte
 }
 
-// Open initializes the in-memory data structure to begin writing
+// Open initializes the in-memory data structure to begin writing.  This must be called
+// before attempting to write or read data.
 func (store *InMemStableStore) Open() error {
 	store.m = make(map[string][]byte)
 	return nil

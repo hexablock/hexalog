@@ -122,7 +122,7 @@ func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry
 }
 
 // GetIndex returns a hexatype.KeylogIndex struct
-func (keylog *Keylog) GetIndex() *hexatype.KeylogIndex {
+func (keylog *Keylog) GetIndex() hexatype.KeylogIndex {
 	return keylog.idx.Index()
 }
 

@@ -19,7 +19,8 @@ type FSM interface {
 }
 
 // StableStore is the interface used to store the FSM state.  It contains information about
-// the current fsm state.
+// each key and the hash of the last applied entry.  This is used when a node is restarted
+// to ensure it is caught up.
 type StableStore interface {
 	Open() error
 	Get(key []byte) ([]byte, error)
@@ -102,8 +103,7 @@ func (fsm *fsm) startApply() {
 		// Signal future that we applied the entry supplying the app fsm response or any errors
 		// encountered
 		fentry.applied(data, mergeErrors(e1, e2))
-		log.Printf("[INFO] Applied key=%s height=%d runtime=%v", entry.Key, entry.Height,
-			fentry.Runtime())
+		log.Printf("[INFO] Applied key=%s height=%d runtime=%v", entry.Key, entry.Height, fentry.Runtime())
 	}
 
 }

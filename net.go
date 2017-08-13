@@ -56,7 +56,9 @@ func (trans *NetTransport) ProposeEntry(host string, entry *hexatype.Entry, opts
 	}
 
 	req := &hexatype.ReqResp{Entry: entry, Options: opts}
-	_, err = conn.client.ProposeRPC(context.Background(), req)
+	if _, err = conn.client.ProposeRPC(context.Background(), req); err != nil {
+		err = hexatype.ParseGRPCError(err)
+	}
 	trans.returnConn(conn)
 
 	return err
@@ -70,10 +72,29 @@ func (trans *NetTransport) CommitEntry(host string, entry *hexatype.Entry, opts 
 	}
 
 	req := &hexatype.ReqResp{Entry: entry, Options: opts}
-	_, err = conn.client.CommitRPC(context.Background(), req)
+	if _, err = conn.client.CommitRPC(context.Background(), req); err != nil {
+		err = hexatype.ParseGRPCError(err)
+	}
 	trans.returnConn(conn)
 
 	return err
+}
+
+func (trans *NetTransport) LastEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error) {
+	conn, err := trans.getConn(host)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &hexatype.ReqResp{Entry: &hexatype.Entry{Key: key}, Options: opts}
+	resp, err := conn.client.LastRPC(context.Background(), req)
+	trans.returnConn(conn)
+
+	if err != nil {
+		return nil, hexatype.ParseGRPCError(err)
+	}
+
+	return resp.Entry, nil
 }
 
 // GetEntry makes a Get request to retrieve an Entry from a remote host.
@@ -88,7 +109,7 @@ func (trans *NetTransport) GetEntry(host string, key, id []byte, opts *hexatype.
 	trans.returnConn(conn)
 
 	if err != nil {
-		return nil, err
+		return nil, hexatype.ParseGRPCError(err)
 	}
 
 	return resp.Entry, nil
@@ -192,6 +213,14 @@ func (trans *NetTransport) GetRPC(ctx context.Context, req *hexatype.ReqResp) (*
 	return resp, err
 }
 
+// LastRPC serves a LastEntry request.  It returns the local last entry for a key.
+func (trans *NetTransport) LastRPC(ctx context.Context, req *hexatype.ReqResp) (*hexatype.ReqResp, error) {
+	var resp = &hexatype.ReqResp{
+		Entry: trans.hlog.store.LastEntry(req.Entry.Key),
+	}
+	return resp, nil
+}
+
 // FetchKeylog fetches the key log from the given host starting at the entry.  If the
 // previous hash of the entry is nil, then all entries for the key are fetched.  It appends
 // each entry directly to the log and submitting to the FSM and returns a FutureEntry
@@ -277,11 +306,9 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 		seek = req.ID
 	}
 
-	log.Printf("[DEBUG] Fetch seek=%x", seek)
 	// Start sending entries starting from the id in the request
 	err = keylog.Iter(seek, func(id []byte, entry *hexatype.Entry) error {
 		resp := &hexatype.ReqResp{Entry: entry, ID: id}
-		log.Printf("[DEBUG] Sending entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
 		return stream.Send(resp)
 	})
 

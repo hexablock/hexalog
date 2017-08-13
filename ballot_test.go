@@ -106,7 +106,7 @@ func TestBallot_voteCommit(t *testing.T) {
 		t.Fatalf("should fail with '%v' have='%v'", errInvalidVoteID, err)
 	}
 
-	b2.close(errPreviousHash)
+	b2.close(hexatype.ErrPreviousHash)
 	if _, err := b2.voteCommit(testEID, "2"); err != errBallotClosed {
 		t.Fatal("should fail with ballot closed", err)
 	}
@@ -115,8 +115,8 @@ func TestBallot_voteCommit(t *testing.T) {
 		t.Fatal("should fail with", errBallotAlreadyClosed)
 	}
 
-	if b2.Error().Error() != errPreviousHash.Error() {
-		t.Fatal("should have error", errPreviousHash)
+	if b2.Error().Error() != hexatype.ErrPreviousHash.Error() {
+		t.Fatal("should have error", hexatype.ErrPreviousHash)
 	}
 
 	t.Logf("Ballot runtime: %v", b2.Runtime())

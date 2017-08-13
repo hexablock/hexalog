@@ -61,6 +61,14 @@ func TestNetTransport(t *testing.T) {
 
 	//s4.hlog.trans.FetchKeylog("127.0.0.1:43212", entry)
 
+	l2, err := s2.hlog.trans.LastEntry("127.0.0.1:43213", []byte("testkey"), &hexatype.RequestOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l2 == nil {
+		t.Fatal("last should not be nil")
+	}
+
 	s1.stop()
 	s2.stop()
 	s3.stop()
