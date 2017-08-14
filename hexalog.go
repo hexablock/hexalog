@@ -20,9 +20,9 @@ type Transport interface {
 	ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Commits an entry on the remote host
 	CommitEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
-	// Transfers a key to the remote host
+	// Transfers a complete key log to the remote host
 	TransferKeylog(host string, key []byte) error
-	// Gets all entries for a key starting at entry
+	// Gets all entries for a key starting at entry from the remote host
 	FetchKeylog(host string, entry *hexatype.Entry) (*FutureEntry, error)
 	// Registers the log when available
 	Register(hlog *Hexalog)

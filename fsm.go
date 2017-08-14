@@ -102,8 +102,9 @@ func (fsm *fsm) startApply() {
 		e2 := fsm.ss.Set(entry.Key, entry.Hash(fsm.hasher.New()))
 		// Signal future that we applied the entry supplying the app fsm response or any errors
 		// encountered
-		fentry.applied(data, mergeErrors(e1, e2))
-		log.Printf("[INFO] Applied key=%s height=%d runtime=%v", entry.Key, entry.Height, fentry.Runtime())
+		e := mergeErrors(e1, e2)
+		fentry.applied(data, e)
+		log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'", entry.Key, entry.Height, fentry.Runtime(), e)
 	}
 
 }

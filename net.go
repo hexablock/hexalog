@@ -323,8 +323,8 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte) error {
 		return err
 	}
 
-	// Nothing to transfer
 	last := keylog.LastEntry()
+	// Nothing to transfer
 	if last == nil {
 		return nil
 	}
@@ -339,11 +339,8 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte) error {
 		return err
 	}
 
-	//
-	// TODO: check last entry for nil
-	//
-
-	// Send request preamble with the last entry and the key location id
+	// Send request preamble with the last entry and the key location id letting the remote
+	// know what key we are requesting
 	preamble := &hexatype.ReqResp{
 		Entry: last,
 		ID:    keylog.LocationID(),
@@ -352,7 +349,7 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte) error {
 		return err
 	}
 
-	// Recieve preamble response with last entry
+	// Recieve preamble response with last entry of remote
 	if preamble, err = stream.Recv(); err != nil {
 		return err
 	}
@@ -394,15 +391,19 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 		return hexatype.ErrKeyInvalid
 	}
 
-	// Get the last entry for the key and assemble a new payload.
-	preamble := &hexatype.ReqResp{
-		Entry: trans.hlog.store.LastEntry(req.Entry.Key),
-	}
+	// TODO:
+	// mark receiving
+	// defer unmark receiving
 
-	// Send last entry for the key back to requester
-	if err = stream.Send(preamble); err != nil {
-		return err
-	}
+	// // Get the last entry for the key and assemble a new payload.
+	// preamble := &hexatype.ReqResp{
+	// 	Entry: trans.hlog.store.LastEntry(req.Entry.Key),
+	// }
+	//
+	// // Send last entry for the key back to requester
+	// if err = stream.Send(preamble); err != nil {
+	// 	return err
+	// }
 
 	// Check for existence of the key locally
 	var keylog *Keylog
@@ -410,6 +411,14 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 		if keylog, err = trans.hlog.store.NewKey(req.Entry.Key, req.ID); err != nil {
 			return err
 		}
+	}
+
+	// Send last entry for the key back to requester
+	preamble := &hexatype.ReqResp{
+		Entry: keylog.LastEntry(),
+	}
+	if err = stream.Send(preamble); err != nil {
+		return err
 	}
 
 	// Future to record the last entry applied
