@@ -154,9 +154,9 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 	if err != nil {
 
 		if err == hexatype.ErrPreviousHash {
-
+			// Try to heal if the new height is > then the current one
 			if entry.Height > prevHeight {
-				// Only try to heal if the new height is > then the current one
+
 				hlog.hch <- &hexatype.ReqResp{
 					ID:      id,    // entry hash id
 					Entry:   entry, // entry itself

@@ -246,7 +246,7 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry) (*Fut
 
 	log.Printf("[DEBUG] Fetching host=%s key=%s height=%d prev=%x", host, entry.Key, entry.Height, entry.Previous)
 	if err = stream.Send(req); err != nil {
-		return nil, err
+		return nil, hexatype.ParseGRPCError(err)
 	}
 
 	// This is the last entry that has been applied to the FSM used to wait
@@ -277,7 +277,7 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry) (*Fut
 
 	}
 
-	return fentry, err
+	return fentry, hexatype.ParseGRPCError(err)
 }
 
 // FetchKeylogRPC streams log entries for key to the caller based on the request
