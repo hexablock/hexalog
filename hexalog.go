@@ -21,9 +21,9 @@ type Transport interface {
 	// Commits an entry on the remote host
 	CommitEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Transfers a complete key log to the remote host
-	TransferKeylog(host string, key []byte) error
+	TransferKeylog(host string, key []byte, opts *hexatype.RequestOptions) error
 	// Gets all entries for a key starting at entry from the remote host
-	FetchKeylog(host string, entry *hexatype.Entry) (*FutureEntry, error)
+	FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*FutureEntry, error)
 	// Registers the log when available
 	Register(hlog *Hexalog)
 	// Shutdown the transport closing outbound connections
@@ -77,6 +77,8 @@ type Hexalog struct {
 	// request down this channel to allow applications to try to recover. This is usually
 	// the case when a keylog falls behind.
 	hch chan *hexatype.ReqResp
+	// Movement tracker of keys being transferred, received, between nodes
+	//mtracker *movementTracker
 	// Gets set when once a shutdown is signalled
 	shutdown int32
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
@@ -95,15 +97,16 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 	}
 
 	hlog := &Hexalog{
-		conf:       conf,
-		fsm:        ifsm,
-		trans:      trans,
-		ballots:    make(map[string]*Ballot),
-		pch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
-		cch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
-		hch:        make(chan *hexatype.ReqResp, conf.HealBufSize),
+		conf:    conf,
+		fsm:     ifsm,
+		trans:   trans,
+		ballots: make(map[string]*Ballot),
+		pch:     make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
+		cch:     make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
+		hch:     make(chan *hexatype.ReqResp, conf.HealBufSize),
+		//mtracker:   newMovementTracker(),
 		store:      logstore,
-		shutdownCh: make(chan struct{}, 3),
+		shutdownCh: make(chan struct{}, 4),
 	}
 
 	// Register Hexalog to the transport to handle RPC requests
@@ -112,6 +115,7 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 	// Start broadcasting
 	go hlog.broadcastProposals()
 	go hlog.broadcastCommits()
+	go hlog.healKeys()
 	go hlog.reapBallots()
 
 	return hlog, nil

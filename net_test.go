@@ -49,11 +49,13 @@ func TestNetTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = s1.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("testkey")); err != nil {
+	opts := &hexatype.RequestOptions{}
+
+	if err = s1.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("testkey"), opts); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = s1.hlog.trans.FetchKeylog("127.0.0.1:43213", entry); err != nil {
+	if _, err = s1.hlog.trans.FetchKeylog("127.0.0.1:43213", entry, opts); err != nil {
 		t.Fatal(err)
 	}
 

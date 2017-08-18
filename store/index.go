@@ -65,15 +65,19 @@ func (store *InMemIndexStore) RemoveKey(key []byte) error {
 
 // Iter iterates over each key in lexographical order issuing the callback with the key
 // and location id.
-func (store *InMemIndexStore) Iter(cb func(string, []byte)) {
+func (store *InMemIndexStore) Iter(cb func(string, []byte) error) error {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
 	keys := store.sortedKeys()
 	for _, k := range keys {
 		kl := store.m[k]
-		cb(k, kl.LocationID())
+		if err := cb(k, kl.LocationID()); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func (store *InMemIndexStore) sortedKeys() []string {

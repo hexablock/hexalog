@@ -1,6 +1,7 @@
 package hexalog
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -222,10 +223,11 @@ func (trans *NetTransport) LastRPC(ctx context.Context, req *hexatype.ReqResp) (
 }
 
 // FetchKeylog fetches the key log from the given host starting at the entry.  If the
-// previous hash of the entry is nil, then all entries for the key are fetched.  It appends
-// each entry directly to the log and submitting to the FSM and returns a FutureEntry
-// which is the last entry that was appended to the key log and/or an error
-func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry) (*FutureEntry, error) {
+// previous hash of the entry is nil, then all entries for the key are fetched. It appends
+// each entry directly to the log and submits to the FSM and returns a FutureEntry which
+// is the last entry that was appended to the key log and/or an error.  The keylog must
+// exist in order for the log to be sucessfully fetched.
+func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*FutureEntry, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return nil, err
@@ -287,8 +289,10 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	if err != nil {
 		return err
 	}
+
+	ent := req.Entry
 	// Make sure a key is specified in the request
-	if req.Entry == nil || req.Entry.Key == nil || len(req.Entry.Key) == 0 {
+	if ent == nil || ent.Key == nil || len(ent.Key) == 0 {
 		log.Printf("[ERROR] Invalid entry/key: %#v", req)
 		return hexatype.ErrKeyInvalid
 	}
@@ -316,7 +320,7 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 }
 
 // TransferKeylog transfers a key directly from the store to the given host
-func (trans *NetTransport) TransferKeylog(host string, key []byte) error {
+func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *hexatype.RequestOptions) error {
 	// Get the keylog
 	keylog, err := trans.hlog.store.GetKey(key)
 	if err != nil {
@@ -339,12 +343,18 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte) error {
 		return err
 	}
 
+	// Set the location id if supplied otherwise use the one from the store
+	var locID []byte
+	ps := opts.PeerSet
+	if (ps != nil) && (len(ps) > 0) && (ps[0].ID != nil) && (len(ps[0].ID) > 0) {
+		locID = ps[0].ID
+	} else {
+		locID = keylog.LocationID()
+	}
+
 	// Send request preamble with the last entry and the key location id letting the remote
 	// know what key we are requesting
-	preamble := &hexatype.ReqResp{
-		Entry: last,
-		ID:    keylog.LocationID(),
-	}
+	preamble := &hexatype.ReqResp{Entry: last, ID: locID}
 	if err = stream.Send(preamble); err != nil {
 		return err
 	}
@@ -395,22 +405,19 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	// mark receiving
 	// defer unmark receiving
 
-	// // Get the last entry for the key and assemble a new payload.
-	// preamble := &hexatype.ReqResp{
-	// 	Entry: trans.hlog.store.LastEntry(req.Entry.Key),
-	// }
-	//
-	// // Send last entry for the key back to requester
-	// if err = stream.Send(preamble); err != nil {
-	// 	return err
-	// }
-
 	// Check for existence of the key locally
 	var keylog *Keylog
 	if keylog, err = trans.hlog.store.GetKey(req.Entry.Key); err != nil {
 		if keylog, err = trans.hlog.store.NewKey(req.Entry.Key, req.ID); err != nil {
 			return err
 		}
+	} else {
+
+		llid := keylog.LocationID()
+		if bytes.Compare(llid, req.ID) != 0 {
+			log.Printf("[TODO] Change location id key=%s from=%x to=%x", req.Entry.Key, llid, req.ID)
+		}
+
 	}
 
 	// Send last entry for the key back to requester

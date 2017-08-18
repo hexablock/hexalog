@@ -143,8 +143,8 @@ func (hlog *LogStore) AppendEntry(entry *hexatype.Entry) error {
 	return err
 }
 
-// Iter iterates over all keys in the store.  It acquires a read-lock and should be used
-// keeping that in mind
-func (hlog *LogStore) Iter(cb func(string, []byte)) {
-	hlog.index.Iter(cb)
+// Iter iterates over all keys in the store issueing the callback with the key and location
+// id.  It acquires a read-lock and should be used keeping that in mind
+func (hlog *LogStore) Iter(cb func(string, []byte) error) error {
+	return hlog.index.Iter(cb)
 }

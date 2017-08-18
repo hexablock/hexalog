@@ -30,7 +30,7 @@ type IndexStore interface {
 	// Remove key if exists or return an error
 	RemoveKey(key []byte) error
 	// Iterate over each key and associated location id
-	Iter(cb func(key string, locID []byte))
+	Iter(cb func(key string, locID []byte) error) error
 }
 
 // KeylogIndex is the index interface for a keylog.
