@@ -28,6 +28,15 @@ func NewLogStore(entries store.EntryStore, index store.IndexStore, hasher hexaty
 	}
 }
 
+// NewKey creates a new keylog for a key.  It returns an error if the key already exists
+func (hlog *LogStore) NewKey(key []byte) (keylog *Keylog, err error) {
+	idx, err := hlog.index.NewKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return NewKeylog(hlog.entries, idx, hlog.hasher), nil
+}
+
 // GetEntry gets an entry by key and id of the entry
 func (hlog *LogStore) GetEntry(key, id []byte) (*hexatype.Entry, error) {
 	return hlog.entries.Get(id)
@@ -47,16 +56,6 @@ func (hlog *LogStore) LastEntry(key []byte) *hexatype.Entry {
 
 	entry, _ := hlog.entries.Get(lh)
 	return entry
-}
-
-// NewKey creates a new keylog for a key with the locationID.  It returns an error if the
-// key already exists
-func (hlog *LogStore) NewKey(key, locationID []byte) (keylog *Keylog, err error) {
-	idx, err := hlog.index.NewKey(key, locationID)
-	if err != nil {
-		return nil, err
-	}
-	return NewKeylog(hlog.entries, idx, hlog.hasher), nil
 }
 
 // NewEntry sets the previous hash and height for a new Entry and returns it
@@ -145,6 +144,6 @@ func (hlog *LogStore) AppendEntry(entry *hexatype.Entry) error {
 
 // Iter iterates over all keys in the store issueing the callback with the key and location
 // id.  It acquires a read-lock and should be used keeping that in mind
-func (hlog *LogStore) Iter(cb func(string, []byte) error) error {
-	return hlog.index.Iter(cb)
-}
+// func (hlog *LogStore) Iter(cb func(string, []byte) error) error {
+// 	return hlog.index.Iter(cb)
+// }

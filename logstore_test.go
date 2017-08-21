@@ -23,7 +23,7 @@ func TestLogStore(t *testing.T) {
 	is := store.NewInMemIndexStore()
 	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
 
-	kl, err := ls.NewKey([]byte("key"), []byte("locationID"))
+	kl, err := ls.NewKey([]byte("key"))
 	if err != nil {
 		log.Fatal(err)
 	}

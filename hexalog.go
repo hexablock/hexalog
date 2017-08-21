@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
@@ -30,31 +29,6 @@ type Transport interface {
 	Shutdown()
 }
 
-// Config holds the configuration for the log.  This is used to initialize the log.
-type Config struct {
-	Hostname           string
-	HealBufSize        int // Buffer size for heal requests
-	BroadcastBufSize   int // proposal and commit broadcast buffer
-	BallotReapInterval time.Duration
-	TTL                time.Duration   // ttl for each ballot
-	Votes              int             // votes required
-	Hasher             hexatype.Hasher // hash function generator
-}
-
-// DefaultConfig returns a sane set of default configurations.  The default hash function
-// used is SHA1
-func DefaultConfig(hostname string) *Config {
-	return &Config{
-		Hostname:           hostname,
-		BroadcastBufSize:   32,
-		HealBufSize:        32,
-		BallotReapInterval: 30 * time.Second,
-		TTL:                3 * time.Second,
-		Votes:              3,
-		Hasher:             &hexatype.SHA1Hasher{},
-	}
-}
-
 // Hexalog is the core log that is responsible for consensus, election, serialization and
 // all other aspects pertaining to consistency
 type Hexalog struct {
@@ -77,8 +51,6 @@ type Hexalog struct {
 	// request down this channel to allow applications to try to recover. This is usually
 	// the case when a keylog falls behind.
 	hch chan *hexatype.ReqResp
-	// Movement tracker of keys being transferred, received, between nodes
-	//mtracker *movementTracker
 	// Gets set when once a shutdown is signalled
 	shutdown int32
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
@@ -97,14 +69,13 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 	}
 
 	hlog := &Hexalog{
-		conf:    conf,
-		fsm:     ifsm,
-		trans:   trans,
-		ballots: make(map[string]*Ballot),
-		pch:     make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
-		cch:     make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
-		hch:     make(chan *hexatype.ReqResp, conf.HealBufSize),
-		//mtracker:   newMovementTracker(),
+		conf:       conf,
+		fsm:        ifsm,
+		trans:      trans,
+		ballots:    make(map[string]*Ballot),
+		pch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
+		cch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
+		hch:        make(chan *hexatype.ReqResp, conf.HealBufSize),
 		store:      logstore,
 		shutdownCh: make(chan struct{}, 4),
 	}
@@ -124,11 +95,11 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 // Heal returns a readonly channel containing information on keys that need healing.  This
 // is consumed by the client application to take action when unhealthy keys are found in
 // order to repair them.
-func (hlog *Hexalog) Heal() <-chan *hexatype.ReqResp {
-	return hlog.hch
-}
+// func (hlog *Hexalog) Heal() <-chan *hexatype.ReqResp {
+// 	return hlog.hch
+// }
 
-// New returns a new Entry to be appended to the log.
+// New returns a new Entry to be appended to the log for the given key.
 func (hlog *Hexalog) New(key []byte) *hexatype.Entry {
 	return hlog.store.NewEntry(key)
 }
@@ -151,12 +122,10 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 	loc := opts.PeerSet[idx]
 	// entry id
 	id := entry.Hash(hlog.conf.Hasher.New())
-
 	// Verify entry
 	prevHeight, err := hlog.verifyEntry(entry)
-	// This will be errPreviousHash
 	if err != nil {
-
+		// Check for heal if previous hash mismatch
 		if err == hexatype.ErrPreviousHash {
 			// Try to heal if the new height is > then the current one
 			if entry.Height > prevHeight {
@@ -167,19 +136,15 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 					Options: opts,  // participating peers
 				}
 
-				//
 				// TODO: Gate to avoid an infinite retry.  Currently gated only by height check.
-				//
 
-				// Retry propose request
+				// TODO: Retry propose request
 				//return hlog.Propose(entry, opts)
 
 			} else if entry.Height == prevHeight {
 				log.Printf("[TODO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
 
-				//
 				// TODO: deep reconciliation
-				//
 
 			} else {
 				log.Printf("[DEBUG] Not healing key=%s curr-height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
@@ -213,7 +178,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 			// Create a new key if height is zero and we don't have it.
 			if prevHeight == 0 {
 				if _, er := hlog.store.GetKey(entry.Key); er != nil {
-					if _, err = hlog.store.NewKey(entry.Key, loc.ID); err != nil {
+					if _, err = hlog.store.NewKey(entry.Key); err != nil {
 						ballot.close(err)
 						return ballot, err
 					}
@@ -243,7 +208,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 		// Create a new key if height is 0 and we don't have the key
 		if prevHeight == 0 {
 			if _, er := hlog.store.GetKey(entry.Key); er != nil {
-				if _, err = hlog.store.NewKey(entry.Key, loc.ID); err != nil {
+				if _, err = hlog.store.NewKey(entry.Key); err != nil {
 					ballot.close(err)
 					return ballot, err
 				}

@@ -20,7 +20,7 @@ func NewInMemIndexStore() *InMemIndexStore {
 
 // NewKey creates a new KeylogIndex and adds it to the store.  It returns an error if it
 // already exists
-func (store *InMemIndexStore) NewKey(key, locID []byte) (KeylogIndex, error) {
+func (store *InMemIndexStore) NewKey(key []byte) (KeylogIndex, error) {
 	k := string(key)
 
 	store.mu.Lock()
@@ -30,10 +30,34 @@ func (store *InMemIndexStore) NewKey(key, locID []byte) (KeylogIndex, error) {
 		return nil, hexatype.ErrKeyExists
 	}
 
-	kli := NewInMemKeylogIndex(key, locID)
+	kli := NewInMemKeylogIndex(key, nil)
 	store.m[k] = kli
 
 	return kli, nil
+}
+
+// UpsertKey creates a new log index for the given key if one does not exist and returns
+// it.  If the log index exists, it is simply returned
+func (store *InMemIndexStore) UpsertKey(key, marker []byte) KeylogIndex {
+	k := string(key)
+	store.mu.RLock()
+	if v, ok := store.m[k]; ok {
+		store.mu.RUnlock()
+		// Set the marker only if the log does not contain it.
+		if !v.Contains(marker) {
+			v.SetMarker(marker)
+		}
+
+		return v
+	}
+	store.mu.RUnlock()
+
+	kli := NewInMemKeylogIndex(key, marker)
+
+	store.mu.Lock()
+	store.m[k] = kli
+	store.mu.Unlock()
+	return kli
 }
 
 // GetKey returns a KeylogIndex from the store or an error if not found
@@ -63,20 +87,16 @@ func (store *InMemIndexStore) RemoveKey(key []byte) error {
 	return hexatype.ErrKeyNotFound
 }
 
-// Iter iterates over each key in lexographical order issuing the callback with the key
-// and location id.
-func (store *InMemIndexStore) Iter(cb func(string, []byte) error) error {
+// Iter iterates over each key and index
+func (store *InMemIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	keys := store.sortedKeys()
-	for _, k := range keys {
-		kl := store.m[k]
-		if err := cb(k, kl.LocationID()); err != nil {
+	for k, v := range store.m {
+		if err := cb([]byte(k), v); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -92,27 +112,44 @@ func (store *InMemIndexStore) sortedKeys() []string {
 }
 
 // InMemKeylogIndex implements an in-memory KeylogIndex interface.  It simply wraps the
-// hexatype.KeylogIndex with a mutex
+// hexatype.KeylogIndex with a mutex for safety.  This index interface is meant to be
+// implemented based on the backend persistent store used.
 type InMemKeylogIndex struct {
 	mu  sync.RWMutex
 	idx *hexatype.KeylogIndex
 }
 
 // NewInMemKeylogIndex instantiates a new in-memory KeylogIndex
-func NewInMemKeylogIndex(key, locID []byte) *InMemKeylogIndex {
-	return &InMemKeylogIndex{idx: hexatype.NewKeylogIndex(key, locID)}
+func NewInMemKeylogIndex(key, marker []byte) *InMemKeylogIndex {
+	idx := &InMemKeylogIndex{idx: hexatype.NewKeylogIndex(key)}
+	idx.idx.Marker = marker
+	return idx
 }
 
-// LocationID return the location id for this keylog index.  This does not require a Lock
-// as it's only written on initialization.
-func (idx *InMemKeylogIndex) LocationID() []byte {
-	return idx.idx.Location
+// Key returns the key for the index
+func (idx *InMemKeylogIndex) Key() []byte {
+	return idx.idx.Key
+}
+
+// Marker returns the marker value
+func (idx *InMemKeylogIndex) Marker() []byte {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.idx.Marker
+}
+
+// SetMarker sets the marker for the index
+func (idx *InMemKeylogIndex) SetMarker(marker []byte) {
+	idx.mu.Lock()
+	idx.idx.Marker = marker
+	idx.mu.Unlock()
 }
 
 // Append appends the id to the index checking the previous hash.
 func (idx *InMemKeylogIndex) Append(id, prev []byte) error {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
+
 	return idx.idx.Append(id, prev)
 }
 
@@ -130,6 +167,13 @@ func (idx *InMemKeylogIndex) Last() []byte {
 	return idx.idx.Last()
 }
 
+// Contains safely returns if the entry id is in the index
+func (idx *InMemKeylogIndex) Contains(id []byte) bool {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.idx.Contains(id)
+}
+
 // Iter iterates over each entry id in the index
 func (idx *InMemKeylogIndex) Iter(seek []byte, cb func(id []byte) error) error {
 	idx.mu.RLock()
@@ -142,6 +186,13 @@ func (idx *InMemKeylogIndex) Count() int {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	return idx.idx.Count()
+}
+
+// Height returns the height of the log in a thread safe way
+func (idx *InMemKeylogIndex) Height() uint32 {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.idx.Height
 }
 
 // Index returns the KeylogIndex index struct.  It is meant be used as readonly

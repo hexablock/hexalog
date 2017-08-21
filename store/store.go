@@ -17,36 +17,46 @@ type EntryStore interface {
 	Get(id []byte) (*hexatype.Entry, error)
 	Set(id []byte, entry *hexatype.Entry) error
 	Delete(id []byte) error
-	// Return the number of entries in the store
-	Count() int
+	Count() int // Return the number of entries in the store
 }
 
-// IndexStore implements a datastore for the log indexes.
+// IndexStore implements a datastore for the log indexes.  It contains all keys on a node
+// with their associated keylog.  The interface must be thread-safe
 type IndexStore interface {
 	// Create a new KeylogIndex and add it to the store.
-	NewKey(key, locationID []byte) (KeylogIndex, error)
+	NewKey(key []byte) (KeylogIndex, error)
 	// Get a KeylogIndex from the store
 	GetKey(key []byte) (KeylogIndex, error)
+	// Create and/or get a KeylogIndex setting the marker if it is created.
+	UpsertKey(key []byte, marker []byte) KeylogIndex
 	// Remove key if exists or return an error
 	RemoveKey(key []byte) error
-	// Iterate over each key and associated location id
-	Iter(cb func(key string, locID []byte) error) error
+	// Iterate over each key
+	Iter(cb func(key []byte, kli KeylogIndex) error) error
 }
 
 // KeylogIndex is the index interface for a keylog.
 type KeylogIndex interface {
-	// Returns location id for the key
-	LocationID() []byte
+	// Key for the keylog index
+	Key() []byte
+	// SetMarker sets the marker
+	SetMarker(id []byte)
+	// returns the marker
+	Marker() []byte
 	// Append id checking previous is equal to prev
 	Append(id, prev []byte) error
-	// Remove last entry
+	// Remove last entr
 	Rollback() int
 	// Last entry id
 	Last() []byte
+	// Contains the entry id or not
+	Contains(id []byte) bool
 	// Iterate each entry id issuing the callback for each bailing on error
 	Iter(seek []byte, cb func(id []byte) error) error
 	// Number of entries
 	Count() int
+	// Height of the keylog
+	Height() uint32
 	// Index object used as readonly
 	Index() hexatype.KeylogIndex
 }

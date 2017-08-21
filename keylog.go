@@ -34,11 +34,6 @@ func NewKeylog(entries store.EntryStore, idx store.KeylogIndex, hasher hexatype.
 	}
 }
 
-// LocationID returns the LocationID for the replicated key
-func (keylog *Keylog) LocationID() []byte {
-	return keylog.idx.LocationID()
-}
-
 // LastEntry returns the last entry in the Keylog.  If there are no entries in the log ,
 // nil is returned.
 func (keylog *Keylog) LastEntry() *hexatype.Entry {
@@ -125,7 +120,3 @@ func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry
 func (keylog *Keylog) GetIndex() hexatype.KeylogIndex {
 	return keylog.idx.Index()
 }
-
-// func (keylog Keylog) MarshalJSON() ([]byte, error) {
-// 	return json.Marshal(keylog.idx)
-// }

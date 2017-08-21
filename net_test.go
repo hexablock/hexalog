@@ -71,6 +71,18 @@ func TestNetTransport(t *testing.T) {
 		t.Fatal("last should not be nil")
 	}
 
+	if _, err = s2.hlog.store.NewKey([]byte("does-not-exist")); err != nil {
+		t.Fatal(err)
+	}
+	ne := s2.hlog.store.NewEntry([]byte("does-not-exist"))
+	if err = s2.hlog.store.AppendEntry(ne); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = s2.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("does-not-exist"), opts); err != hexatype.ErrKeyNotFound {
+		t.Fatal("should fail with", hexatype.ErrKeyNotFound, err)
+	}
+
 	s1.stop()
 	s2.stop()
 	s3.stop()
