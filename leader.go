@@ -82,6 +82,11 @@ func (l *KeyLeader) LastEntry() *hexatype.Entry {
 	return l.lasts[l.idx]
 }
 
+// Entries returns the last entries for each location
+func (l *KeyLeader) Entries() []*hexatype.Entry {
+	return l.lasts
+}
+
 // MarshalJSON is a custom marshaller to output a user friendly structure.
 func (l KeyLeader) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {

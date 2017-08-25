@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -21,7 +22,7 @@ type Transport interface {
 	CommitEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Transfers a complete key log to the remote host
 	TransferKeylog(host string, key []byte, opts *hexatype.RequestOptions) error
-	// Gets all entries for a key starting at entry from the remote host
+	// Gets all entries from the remote host for a key starting at entry
 	FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*FutureEntry, error)
 	// Registers the log when available
 	Register(hlog *Hexalog)
@@ -285,6 +286,23 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 	hlog.checkCommitAndAct(votes, ballot, id, entry, opts)
 
 	return ballot, nil
+}
+
+// Heal submits a heal request for the given key.  It returns an error if the options are
+// invalid or if the node is not part of the set.
+func (hlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
+	if err := hlog.checkOptions(opts); err != nil {
+		return err
+	}
+	locs := hexaring.LocationSet(opts.PeerSet)
+	if _, err := locs.GetByHost(hlog.conf.Hostname); err != nil {
+		return err
+	}
+
+	ent := &hexatype.Entry{Key: key}
+	hlog.hch <- &hexatype.ReqResp{Options: opts, Entry: ent}
+
+	return nil
 }
 
 // Shutdown signals a shutdown and waits for all go-routines to exit before returning.  It

@@ -2,10 +2,10 @@ package hexalog
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
 
 // sendProposal makes a single proposal request to a location.  if a hexatype.ErrPreviousHash

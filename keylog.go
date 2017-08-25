@@ -6,7 +6,6 @@ import (
 
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
-	"github.com/hexablock/log"
 )
 
 var (
@@ -59,9 +58,7 @@ func (keylog *Keylog) AppendEntry(entry *hexatype.Entry) (err error) {
 	// Add id to index.  The index will check for order based on the supplied previous.  We
 	// do not rollback the above entry from the entry store on error as only entries in the
 	// index matter.
-	if err = keylog.idx.Append(id, entry.Previous); err == nil {
-		log.Printf("[INFO] Appended key=%s height=%d id=%x", entry.Key, entry.Height, entry.Hash(keylog.hasher.New()))
-	}
+	err = keylog.idx.Append(id, entry.Previous)
 
 	//
 	// TODO: Cleanup residual entries via some deferred process

@@ -1,55 +1,36 @@
 package hexalog
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
 
-func (hlog *Hexalog) heal(req *hexatype.ReqResp) error {
-	ent := req.Entry
-	locs := req.Options.LocationSet()
-	keylog, err := hlog.store.GetKey(ent.Key)
+func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
+	// Make sure we are part of the set
+	if _, err := locs.GetByHost(hlog.conf.Hostname); err != nil {
+		return err
+	}
 
-	// Heal from the leader if we don't have the key at all.
+	var last *hexatype.Entry
+	keylog, err := hlog.store.GetKey(key)
 	if err != nil {
-		// Make sure we are part of the set
-		if _, err = locs.GetByHost(hlog.conf.Hostname); err != nil {
-			return err
-		}
 		// Create new key
-		if _, err = hlog.store.NewKey(ent.Key); err != nil {
+		if _, err = hlog.store.NewKey(key); err != nil {
 			return err
 		}
+		last = &hexatype.Entry{Key: key}
 
-		// If we don't have the key try to get it from the leader
-		last := &hexatype.Entry{Key: ent.Key}
-		er := hlog.healFromLeader(last, locs)
-		return mergeErrors(err, er)
-	}
+	} else {
 
-	// Try each location
-	for _, loc := range locs {
-		if loc.Host() == hlog.conf.Hostname {
-			continue
-		}
-
-		last := keylog.LastEntry()
-		if last == nil {
-			// Dont set Previous so we can signal a complete keylog download
-			last = &hexatype.Entry{Key: ent.Key}
-		}
-
-		if _, er := hlog.trans.FetchKeylog(loc.Host(), last, &hexatype.RequestOptions{}); er != nil {
-			log.Printf("[ERROR] Failed to fetch KeyLog key=%s vnode=%s/%x error='%v'", ent.Key,
-				loc.Host(), loc.Vnode.Id, er)
+		if last = keylog.LastEntry(); last == nil {
+			last = &hexatype.Entry{Key: key}
 		}
 
 	}
 
-	return nil
+	er := hlog.healFromLeader(last, locs)
+	return mergeErrors(err, er)
 }
 
 // healFromLeader takes the current local last entry for the key and a set of locations,
@@ -62,9 +43,10 @@ func (hlog *Hexalog) healFromLeader(last *hexatype.Entry, locs hexaring.Location
 	}
 
 	loc := keyLeader.Location()
-	// Can't heal self from self
+	// If we are the leader there's nothing to do
 	if loc.Host() == hlog.conf.Hostname {
-		return fmt.Errorf("cannot heal from self")
+		//return fmt.Errorf("cannot heal from self")
+		return nil
 	}
 
 	_, err = hlog.trans.FetchKeylog(loc.Host(), last, &hexatype.RequestOptions{})
@@ -76,7 +58,7 @@ func (hlog *Hexalog) healFromLeader(last *hexatype.Entry, locs hexaring.Location
 func (hlog *Hexalog) healKeys() {
 	for req := range hlog.hch {
 
-		if err := hlog.heal(req); err != nil {
+		if err := hlog.heal(req.Entry.Key, req.Options.PeerSet); err != nil {
 			log.Printf("[ERROR] Failed to heal key=%s height=%d id=%x error='%v'", req.Entry.Key, req.Entry.Height, req.ID, err)
 		}
 
