@@ -1,55 +1,73 @@
 package hexalog
 
 import (
+	"bytes"
+
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
 func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
-	// Make sure we are part of the set
-	if _, err := locs.GetByHost(hlog.conf.Hostname); err != nil {
-		return err
-	}
-
-	var last *hexatype.Entry
-	keylog, err := hlog.store.GetKey(key)
-	if err != nil {
-		// Create new key
-		if _, err = hlog.store.NewKey(key); err != nil {
-			return err
-		}
-		last = &hexatype.Entry{Key: key}
-
-	} else {
-
-		if last = keylog.LastEntry(); last == nil {
-			last = &hexatype.Entry{Key: key}
-		}
-
-	}
-
-	er := hlog.healFromLeader(last, locs)
-	return mergeErrors(err, er)
-}
-
-// healFromLeader takes the current local last entry for the key and a set of locations,
-// determines the node with the highest height and tries to replicate log entries from
-// it
-func (hlog *Hexalog) healFromLeader(last *hexatype.Entry, locs hexaring.LocationSet) error {
-	keyLeader, err := hlog.Leader(last.Key, locs)
+	// Make sure we are part of the set.  We check this first as the leader call make rpc's
+	// which do not want to unnecessarily make.
+	sloc, err := locs.GetByHost(hlog.conf.Hostname)
 	if err != nil {
 		return err
 	}
 
-	loc := keyLeader.Location()
-	// If we are the leader there's nothing to do
-	if loc.Host() == hlog.conf.Hostname {
-		//return fmt.Errorf("cannot heal from self")
+	leader, err := hlog.Leader(key, locs)
+	if err != nil {
+		return err
+	}
+
+	lle := leader.LastEntry()
+	// Nothing to do as leader has nothing
+	if lle == nil {
 		return nil
 	}
 
-	_, err = hlog.trans.FetchKeylog(loc.Host(), last, &hexatype.RequestOptions{})
+	// Leader location
+	lloc := leader.Location()
+
+	// We are the leader, so nothing to do
+	if lloc.Host() == sloc.Host() {
+		return nil
+	}
+
+	_, err = hlog.store.GetKey(key)
+	if err != nil {
+		// Create new key
+		if err == hexatype.ErrKeyNotFound {
+			if _, err = hlog.store.NewKey(key); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	var (
+		h     = hlog.conf.Hasher.New()
+		llh   = lle.Hash(h)
+		slh   []byte
+		lasts = leader.Entries()
+		last  = lasts[sloc.Priority]
+	)
+
+	if last == nil {
+		last = &hexatype.Entry{Key: key, Height: 0}
+		slh = make([]byte, h.Size())
+	} else {
+		h.Reset()
+		slh = last.Hash(h)
+	}
+
+	if bytes.Compare(slh, llh) != 0 {
+		_, er := hlog.trans.FetchKeylog(lloc.Host(), last, nil)
+		return mergeErrors(err, er)
+	}
+
 	return err
 }
 

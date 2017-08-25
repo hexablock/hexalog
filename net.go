@@ -80,6 +80,7 @@ func (trans *NetTransport) CommitEntry(host string, entry *hexatype.Entry, opts 
 	return err
 }
 
+// LastEntry retrieves the last entry for the given key from a remote host.
 func (trans *NetTransport) LastEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
@@ -235,11 +236,9 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry, opts 
 		return nil, err
 	}
 
-	// Send the entry we want to start at
+	// Send the entry we want to start at.  Only generate an id for the entry if the
+	// previous hash is not nil.  Remote assumes all log entries if the request id is nil.
 	req := &hexatype.ReqResp{Entry: entry}
-
-	// Only generate an id for the entry if the previous hash is not nil.  Remote assumes
-	// all log entries if the request id is nil
 	if entry.Previous != nil {
 		req.ID = entry.Hash(trans.hlog.conf.Hasher.New())
 	}

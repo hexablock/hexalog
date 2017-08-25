@@ -46,7 +46,7 @@ type fsm struct {
 	applyCh chan *FutureEntry
 	// Stable store to track which entries have been applied to the fsm.
 	ss StableStore
-
+	// hash function to use
 	hasher hexatype.Hasher
 }
 
