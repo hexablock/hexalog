@@ -3,7 +3,8 @@ package store
 import (
 	"bytes"
 	"testing"
-	"time"
+
+	"github.com/hexablock/hexatype"
 )
 
 func TestInMemStableStore(t *testing.T) {
@@ -23,25 +24,24 @@ func TestInMemStableStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ss.Set([]byte("key"), []byte("value"))
-	ss.Set([]byte("key1"), []byte("value"))
-	ss.Set([]byte("key2"), []byte("value"))
-	ss.Set([]byte("key3"), []byte("value"))
+	ss.Set(&hexatype.Entry{Key: []byte("key1"), Data: []byte("value")})
+	ss.Set(&hexatype.Entry{Key: []byte("key2"), Data: []byte("value")})
+	ss.Set(&hexatype.Entry{Key: []byte("key3"), Data: []byte("value")})
+	ss.Set(&hexatype.Entry{Key: []byte("key4"), Data: []byte("value")})
 
-	val, err := ss.Get([]byte("key"))
+	val, err := ss.Get([]byte("key1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(val, []byte("value")) != 0 {
+	if bytes.Compare(val.Data, []byte("value")) != 0 {
 		t.Fatal("wrong value")
 	}
-	// Wait for flush
-	<-time.After(1 * time.Second)
-	val, err = ss.Get([]byte("key"))
+
+	val, err = ss.Get([]byte("key3"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(val, []byte("value")) != 0 {
+	if bytes.Compare(val.Data, []byte("value")) != 0 {
 		t.Fatal("wrong value")
 	}
 
@@ -49,7 +49,7 @@ func TestInMemStableStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = ss.Get([]byte("not-found")); err == nil {
+	if _, err = ss.Get([]byte("not-found")); err != hexatype.ErrKeyNotFound {
 		t.Fatal("key should not be found")
 	}
 

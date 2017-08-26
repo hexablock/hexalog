@@ -3,6 +3,8 @@ package store
 import (
 	"errors"
 	"sync"
+
+	"github.com/hexablock/hexatype"
 )
 
 var (
@@ -12,18 +14,18 @@ var (
 // InMemStableStore implements an in-memory StableStore interface
 type InMemStableStore struct {
 	mu sync.RWMutex
-	m  map[string][]byte
+	m  map[string]*hexatype.Entry
 }
 
 // Open initializes the in-memory data structure to begin writing.  This must be called
 // before attempting to write or read data.
 func (store *InMemStableStore) Open() error {
-	store.m = make(map[string][]byte)
+	store.m = make(map[string]*hexatype.Entry)
 	return nil
 }
 
 // Get gets a key from the in-memory data structure
-func (store *InMemStableStore) Get(key []byte) ([]byte, error) {
+func (store *InMemStableStore) Get(key []byte) (*hexatype.Entry, error) {
 	store.mu.RLock()
 	if val, ok := store.m[string(key)]; ok {
 		defer store.mu.RUnlock()
@@ -31,13 +33,13 @@ func (store *InMemStableStore) Get(key []byte) ([]byte, error) {
 	}
 	store.mu.RUnlock()
 
-	return nil, errNotFound
+	return nil, hexatype.ErrKeyNotFound
 }
 
 // Set sets a key to the value to the in memory structure
-func (store *InMemStableStore) Set(key, value []byte) error {
+func (store *InMemStableStore) Set(entry *hexatype.Entry) error {
 	store.mu.Lock()
-	store.m[string(key)] = value
+	store.m[string(entry.Key)] = entry
 	store.mu.Unlock()
 	return nil
 }

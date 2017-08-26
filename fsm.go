@@ -23,8 +23,8 @@ type FSM interface {
 // to ensure it is caught up.
 type StableStore interface {
 	Open() error
-	Get(key []byte) ([]byte, error)
-	Set(key, value []byte) error
+	Get(key []byte) (*hexatype.Entry, error)
+	Set(entry *hexatype.Entry) error
 	Close() error
 }
 
@@ -99,7 +99,7 @@ func (fsm *fsm) startApply() {
 			}
 		}
 		// Commit the last fsm applied entry to stable store
-		e2 := fsm.ss.Set(entry.Key, entry.Hash(fsm.hasher.New()))
+		e2 := fsm.ss.Set(entry)
 		// Signal future that we applied the entry supplying the app fsm response or any errors
 		// encountered
 		e := mergeErrors(e1, e2)
