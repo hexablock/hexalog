@@ -2,38 +2,30 @@ package store
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/hexablock/hexatype"
 )
 
 func TestInMemStableStore(t *testing.T) {
-	// td, err := ioutil.TempDir("/tmp", "sstore")
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// defer os.RemoveAll(td)
-
-	// opt := badger.DefaultOptions
-	// opt.Dir = td
-	// opt.ValueDir = td
-	//ss := NewBadgerStableStore(opt)
 	ss := &InMemStableStore{}
 	err := ss.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ss.Set(&hexatype.Entry{Key: []byte("key1"), Data: []byte("value")})
-	ss.Set(&hexatype.Entry{Key: []byte("key2"), Data: []byte("value")})
-	ss.Set(&hexatype.Entry{Key: []byte("key3"), Data: []byte("value")})
-	ss.Set(&hexatype.Entry{Key: []byte("key4"), Data: []byte("value")})
+	ss.Set([]byte("key1"), []byte("value"))
+	ss.Set([]byte("key2"), []byte("value"))
+	ss.Set([]byte("key3"), []byte("value"))
+	ss.Set([]byte("key4"), []byte("value"))
 
 	val, err := ss.Get([]byte("key1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(val.Data, []byte("value")) != 0 {
+	if bytes.Compare(val, []byte("value")) != 0 {
 		t.Fatal("wrong value")
 	}
 
@@ -41,7 +33,7 @@ func TestInMemStableStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(val.Data, []byte("value")) != 0 {
+	if bytes.Compare(val, []byte("value")) != 0 {
 		t.Fatal("wrong value")
 	}
 
@@ -53,21 +45,45 @@ func TestInMemStableStore(t *testing.T) {
 		t.Fatal("key should not be found")
 	}
 
-	// Re-open  store and check
-	//ss1 := NewBadgerStableStore(opt)
-	// if err = ss1.Open(); err != nil {
-	// 	t.Fatal(err)
-	// }
-	//
-	// val, err = ss1.Get([]byte("key"))
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// if bytes.Compare(val, []byte("value")) != 0 {
-	// 	t.Fatalf("wrong value '%s'", val)
-	// }
-	//
-	// if err = ss1.Close(); err != nil {
-	// 	t.Fatal(err)
-	// }
+}
+
+func TestBadgerStableStore(t *testing.T) {
+	td, err := ioutil.TempDir("/tmp", "sstore")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(td)
+
+	ss := NewBadgerStableStore(td)
+	if err = ss.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+
+	if err = ss.Set([]byte("key"), []byte("data")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ss.Get([]byte("key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = ss.Get([]byte("keyber")); err != hexatype.ErrKeyNotFound {
+		t.Fatal("should fail with", hexatype.ErrKeyNotFound, err)
+	}
+
+	if err = ss.Set([]byte("key2"), []byte("data")); err != nil {
+		t.Fatal(err)
+	}
+
+	var c int
+	ss.Iter(func(key []byte, val []byte) error {
+		c++
+		return nil
+	})
+
+	if c != 2 {
+		t.Fatal("should have 2 keys")
+	}
 }

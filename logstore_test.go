@@ -48,7 +48,8 @@ func TestLogStore(t *testing.T) {
 		t.Fatal("should have 3 entries for key index")
 	}
 
-	if kl.entries.Count() != 3 {
+	est := kl.entries.(*store.InMemEntryStore)
+	if est.Count() != 3 {
 		t.Fatal("should have 3 entries")
 	}
 }

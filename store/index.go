@@ -38,17 +38,13 @@ func (store *InMemIndexStore) NewKey(key []byte) (KeylogIndex, error) {
 
 // UpsertKey creates a new log index for the given key if one does not exist and returns
 // it.  If the log index exists, it is simply returned
-func (store *InMemIndexStore) UpsertKey(key, marker []byte) KeylogIndex {
+func (store *InMemIndexStore) UpsertKey(key, marker []byte) (KeylogIndex, error) {
 	k := string(key)
 	store.mu.RLock()
 	if v, ok := store.m[k]; ok {
 		store.mu.RUnlock()
-		// Set the marker only if the log does not contain it.
-		if !v.Contains(marker) {
-			v.SetMarker(marker)
-		}
-
-		return v
+		_, err := v.SetMarker(marker)
+		return v, err
 	}
 	store.mu.RUnlock()
 
@@ -57,7 +53,7 @@ func (store *InMemIndexStore) UpsertKey(key, marker []byte) KeylogIndex {
 	store.mu.Lock()
 	store.m[k] = kli
 	store.mu.Unlock()
-	return kli
+	return kli, nil
 }
 
 // GetKey returns a KeylogIndex from the store or an error if not found
@@ -138,11 +134,13 @@ func (idx *InMemKeylogIndex) Marker() []byte {
 	return idx.idx.Marker
 }
 
-// SetMarker sets the marker for the index
-func (idx *InMemKeylogIndex) SetMarker(marker []byte) {
+// SetMarker sets the marker for the index.  It returns true if the marker is not part of
+// the index and was set.  This never returns an error as it is in-memory
+func (idx *InMemKeylogIndex) SetMarker(marker []byte) (bool, error) {
 	idx.mu.Lock()
-	idx.idx.Marker = marker
+	ok := idx.idx.SetMarker(marker)
 	idx.mu.Unlock()
+	return ok, nil
 }
 
 // Append appends the id to the index checking the previous hash.
@@ -154,7 +152,7 @@ func (idx *InMemKeylogIndex) Append(id, prev []byte) error {
 }
 
 // Rollback safely removes the last entry id
-func (idx *InMemKeylogIndex) Rollback() int {
+func (idx *InMemKeylogIndex) Rollback() (int, bool) {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 	return idx.idx.Rollback()

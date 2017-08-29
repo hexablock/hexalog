@@ -64,7 +64,7 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 	trans Transport) (*Hexalog, error) {
 
 	// Init internal FSM that manages the user provided application fsm
-	ifsm, err := newFsm(appFSM, stableStore, conf.Hasher)
+	ifsm, err := newFsm(appFSM, stableStore, logstore, conf.Hasher)
 	if err != nil {
 		return nil, err
 	}
@@ -81,24 +81,27 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		shutdownCh: make(chan struct{}, 4),
 	}
 
-	// Register Hexalog to the transport to handle RPC requests
-	trans.Register(hlog)
+	// Check to make sure the fsm has all the entries in the log applied.  If not then submit
+	// the remaining entries to be applied to the fsm.
+	if err = hlog.fsm.check(); err != nil {
+		return nil, err
+	}
 
-	// Start broadcasting
-	go hlog.broadcastProposals()
-	go hlog.broadcastCommits()
-	go hlog.healKeys()
-	go hlog.reapBallots()
+	// Start
+	hlog.start()
 
 	return hlog, nil
 }
 
-// Heal returns a readonly channel containing information on keys that need healing.  This
-// is consumed by the client application to take action when unhealthy keys are found in
-// order to repair them.
-// func (hlog *Hexalog) Heal() <-chan *hexatype.ReqResp {
-// 	return hlog.hch
-// }
+func (hlog *Hexalog) start() {
+	// Register Hexalog to the transport to handle RPC requests
+	hlog.trans.Register(hlog)
+
+	go hlog.broadcastProposals()
+	go hlog.broadcastCommits()
+	go hlog.healKeys()
+	go hlog.reapBallots()
+}
 
 // New returns a new Entry to be appended to the log for the given key.
 func (hlog *Hexalog) New(key []byte) *hexatype.Entry {
@@ -138,7 +141,6 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 				}
 
 				// TODO: Gate to avoid an infinite retry.  Currently gated only by height check.
-
 				// TODO: Retry propose request
 				//return hlog.Propose(entry, opts)
 

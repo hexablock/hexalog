@@ -9,9 +9,9 @@ import (
 // Config holds the configuration for the log.  This is used to initialize the log.
 type Config struct {
 	Hostname           string
-	HealBufSize        int // Buffer size for heal requests
-	BroadcastBufSize   int // proposal and commit broadcast buffer
-	BallotReapInterval time.Duration
+	HealBufSize        int             // Buffer size for heal requests
+	BroadcastBufSize   int             // proposal and commit broadcast buffer
+	BallotReapInterval time.Duration   // interval at which old ballots are cleaned up
 	TTL                time.Duration   // ttl for each ballot
 	Votes              int             // votes required
 	Hasher             hexatype.Hasher // hash function generator

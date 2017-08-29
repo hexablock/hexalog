@@ -95,7 +95,8 @@ func (keylog *Keylog) RollbackEntry(entry *hexatype.Entry) (int, error) {
 	}
 
 	// Remove id from index
-	return keylog.idx.Rollback(), nil
+	n, _ := keylog.idx.Rollback()
+	return n, nil
 }
 
 // Iter iterates over entries starting from the seek position.  It iterates over all
