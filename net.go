@@ -49,7 +49,7 @@ func NewNetTransport(reapInterval, maxConnIdle time.Duration) *NetTransport {
 }
 
 // ProposeEntry makes a Propose request on a remote host
-func (trans *NetTransport) ProposeEntry(host string, ctx context.Context, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err
@@ -65,7 +65,7 @@ func (trans *NetTransport) ProposeEntry(host string, ctx context.Context, entry 
 }
 
 // CommitEntry makes a Commit request on a remote host
-func (trans *NetTransport) CommitEntry(host string, ctx context.Context, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) CommitEntry(ctx context.Context, host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err

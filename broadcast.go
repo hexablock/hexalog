@@ -17,7 +17,7 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *hexatype.Entry, lo
 	o := opts.CloneWithSourceIndex(int32(idx))
 
 	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
-	err := hlog.trans.ProposeEntry(host, ctx, entry, o)
+	err := hlog.trans.ProposeEntry(ctx, host, entry, o)
 
 	switch err {
 	case hexatype.ErrPreviousHash:
@@ -111,17 +111,9 @@ func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.Reque
 			host := loc.Vnode.Host
 
 			log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
-			resp <- hlog.trans.CommitEntry(host, ctx, ent, o)
+			resp <- hlog.trans.CommitEntry(ctx, host, ent, o)
 
 		}(entry, p, idx, opts)
-
-		// o := opts.CloneWithSourceIndex(int32(idx))
-		// log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname,
-		// 	p.Vnode.Host, o.SourceIndex)
-		//
-		// if err := hlog.trans.CommitEntry(p.Vnode.Host, ctx, entry, o); err != nil {
-		// 	return err
-		// }
 
 	}
 
