@@ -132,9 +132,11 @@ func (b *Ballot) votePropose(id []byte, voter string) (int, error) {
 // voteCommit submits a commit vote.  If the voter has already voted it simply
 // returns the committed votes with no error
 func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
-	if atomic.LoadInt32(&b.closed) == 1 {
-		return -1, errBallotClosed
-	}
+	// We dont check ballot close here as you may have stragglers.
+
+	// if atomic.LoadInt32(&b.closed) == 1 {
+	// 	return -1, errBallotClosed
+	// }
 
 	// Check the entry id to make sure it matches the ballot.
 	if bytes.Compare(b.fentry.ID(), id) != 0 {

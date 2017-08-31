@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"golang.org/x/net/context"
+
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
@@ -17,9 +19,9 @@ type Transport interface {
 	// Get last entry for the key
 	LastEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error)
 	// Proposes an entry on the remote host
-	ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
+	ProposeEntry(host string, ctx context.Context, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Commits an entry on the remote host
-	CommitEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
+	CommitEntry(host string, ctx context.Context, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
 	// Transfers a complete key log to the remote host
 	TransferKeylog(host string, key []byte, opts *hexatype.RequestOptions) error
 	// Gets all entries from the remote host for a key starting at entry
@@ -258,8 +260,7 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 	//
 
 	id := entry.Hash(hlog.conf.Hasher.New())
-
-	// Make sure we have the ballot.  This locking scales better over the long run.
+	// Make sure we have the ballot for the entry id
 	ballot := hlog.getBallot(id)
 	if ballot == nil {
 		return nil, errBallotNotFound
@@ -269,12 +270,8 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 	// TODO: Verify & Validate
 	//
 
-	//
-	// TODO: Rollback if necessary
-	//
-
-	vid := opts.PeerSet[opts.SourceIndex].Vnode.Id
-
+	sloc := opts.SourcePeer()
+	vid := sloc.Vnode.Id
 	votes, err := ballot.voteCommit(id, string(vid))
 	log.Printf("[DEBUG] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)

@@ -98,17 +98,31 @@ func TestBallot_voteCommit(t *testing.T) {
 	if _, err := b2.voteCommit(testEID, "2"); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := b2.voteCommit(testEID, "2"); c != 1 {
+
+	c, _ := b2.voteCommit(testEID, "2")
+	if c != 1 {
 		t.Fatal("should have 1 commit vote", c)
 	}
 
-	if _, err := b2.voteCommit([]byte("fooby"), "0"); err != errInvalidVoteID {
+	_, err := b2.voteCommit([]byte("fooby"), "0")
+	if err != errInvalidVoteID {
 		t.Fatalf("should fail with '%v' have='%v'", errInvalidVoteID, err)
 	}
 
 	b2.close(hexatype.ErrPreviousHash)
-	if _, err := b2.voteCommit(testEID, "2"); err != errBallotClosed {
-		t.Fatal("should fail with ballot closed", err)
+	// if _, err := b2.voteCommit(testEID, "2"); err != errBallotClosed {
+	// 	t.Fatal("should fail with ballot closed", err)
+	// }
+	ci, err := b2.voteCommit(testEID, "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ci != c {
+		t.Fatalf("votes want=%d have=%d", c, ci)
+	}
+
+	if c1, _ := b2.voteCommit(testEID, "new"); c1 != ci+1 {
+		t.Fatal("should have votes", ci+1)
 	}
 
 	if er := b2.close(nil); er != errBallotAlreadyClosed {

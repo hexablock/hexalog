@@ -173,7 +173,8 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 		// Close the ballot after we've submitted to the fsm
 		ballot.close(nil)
 		// Ballot is closed.  Remove ballot and stop tracking
-		hlog.removeBallot(key)
+		//hlog.removeBallot(key)
 	}
 
+	// Do nothing as it may be a repetative vote
 }

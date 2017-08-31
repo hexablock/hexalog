@@ -3,6 +3,8 @@ package hexalog
 import (
 	"fmt"
 
+	"golang.org/x/net/context"
+
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
@@ -10,12 +12,12 @@ import (
 
 // sendProposal makes a single proposal request to a location.  if a hexatype.ErrPreviousHash
 // error is returned a  heal request is submitted
-func (hlog *Hexalog) sendProposal(entry *hexatype.Entry, loc *hexaring.Location, idx int, opts *hexatype.RequestOptions) error {
+func (hlog *Hexalog) sendProposal(ctx context.Context, entry *hexatype.Entry, loc *hexaring.Location, idx int, opts *hexatype.RequestOptions) error {
 	host := loc.Vnode.Host
 	o := opts.CloneWithSourceIndex(int32(idx))
 
 	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
-	err := hlog.trans.ProposeEntry(host, entry, o)
+	err := hlog.trans.ProposeEntry(host, ctx, entry, o)
 
 	switch err {
 	case hexatype.ErrPreviousHash:
@@ -39,16 +41,28 @@ func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.Requ
 		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
 	}
 
-	for _, p := range opts.PeerSet {
-		// Do not broadcast to self
-		if p.Vnode.Host == hlog.conf.Hostname {
+	l := len(opts.PeerSet) - 1
+	resp := make(chan error, l)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	for j, p := range opts.PeerSet {
+		// Skip broadcasting to self
+		if idx == j {
 			continue
 		}
 
-		if err := hlog.sendProposal(entry, p, idx, opts); err != nil {
+		go func(ent *hexatype.Entry, loc *hexaring.Location, i int, o *hexatype.RequestOptions) {
+			resp <- hlog.sendProposal(ctx, ent, loc, i, o)
+		}(entry, p, idx, opts)
+
+	}
+
+	defer cancel()
+
+	for i := 0; i < l; i++ {
+		if err := <-resp; err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -57,6 +71,7 @@ func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.Requ
 // broadcastProposals starts consuming the proposal broadcast channel to broadcast
 // locally proposed entries to the network.  This is mean to be run in a go-routine.
 func (hlog *Hexalog) broadcastProposals() {
+
 	for msg := range hlog.pch {
 
 		if err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
@@ -81,17 +96,39 @@ func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.Reque
 		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
 	}
 
-	for _, p := range opts.PeerSet {
+	l := len(opts.PeerSet) - 1
+	resp := make(chan error, l)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	for j, p := range opts.PeerSet {
 		// Do not broadcast to self
-		if p.Vnode.Host == hlog.conf.Hostname {
+		if j == idx {
 			continue
 		}
 
-		o := opts.CloneWithSourceIndex(int32(idx))
-		log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname,
-			p.Vnode.Host, o.SourceIndex)
+		go func(ent *hexatype.Entry, loc *hexaring.Location, i int, opt *hexatype.RequestOptions) {
+			o := opt.CloneWithSourceIndex(int32(i))
+			host := loc.Vnode.Host
 
-		if err := hlog.trans.CommitEntry(p.Vnode.Host, entry, o); err != nil {
+			log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
+			resp <- hlog.trans.CommitEntry(host, ctx, ent, o)
+
+		}(entry, p, idx, opts)
+
+		// o := opts.CloneWithSourceIndex(int32(idx))
+		// log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname,
+		// 	p.Vnode.Host, o.SourceIndex)
+		//
+		// if err := hlog.trans.CommitEntry(p.Vnode.Host, ctx, entry, o); err != nil {
+		// 	return err
+		// }
+
+	}
+
+	defer cancel()
+
+	for i := 0; i < l; i++ {
+		if err := <-resp; err != nil {
 			return err
 		}
 
@@ -107,7 +144,6 @@ func (hlog *Hexalog) broadcastCommits() {
 	for msg := range hlog.cch {
 
 		en := msg.Entry
-
 		err := hlog.broadcastCommit(en, msg.Options)
 		if err == nil {
 			continue

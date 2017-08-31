@@ -49,14 +49,14 @@ func NewNetTransport(reapInterval, maxConnIdle time.Duration) *NetTransport {
 }
 
 // ProposeEntry makes a Propose request on a remote host
-func (trans *NetTransport) ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) ProposeEntry(host string, ctx context.Context, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err
 	}
 
 	req := &hexatype.ReqResp{Entry: entry, Options: opts}
-	if _, err = conn.client.ProposeRPC(context.Background(), req); err != nil {
+	if _, err = conn.client.ProposeRPC(ctx, req); err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
 	trans.returnConn(conn)
@@ -65,14 +65,14 @@ func (trans *NetTransport) ProposeEntry(host string, entry *hexatype.Entry, opts
 }
 
 // CommitEntry makes a Commit request on a remote host
-func (trans *NetTransport) CommitEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) CommitEntry(host string, ctx context.Context, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err
 	}
 
 	req := &hexatype.ReqResp{Entry: entry, Options: opts}
-	if _, err = conn.client.CommitRPC(context.Background(), req); err != nil {
+	if _, err = conn.client.CommitRPC(ctx, req); err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
 	trans.returnConn(conn)
