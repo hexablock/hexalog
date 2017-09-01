@@ -141,9 +141,9 @@ func (hlog *Hexalog) broadcastCommits() {
 			continue
 		}
 
+		// Close the ballot with the given error
 		id := en.Hash(hlog.conf.Hasher.New())
 		hlog.ballotGetClose(id, err)
-
 		// Rollback the entry.
 		if er := hlog.store.RollbackEntry(en); er != nil {
 			log.Printf("[ERROR] Failed to rollback key=%s height=%d id=%x error='%v'", en.Key, en.Height, id, er)

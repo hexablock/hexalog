@@ -141,10 +141,12 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
 				}
-
+				//
 				// TODO: Gate to avoid an infinite retry.  Currently gated only by height check.
-				// TODO: Retry propose request
-				//return hlog.Propose(entry, opts)
+				//
+
+				// Return here to allow for a retry.
+				return nil, err
 
 			} else if entry.Height == prevHeight {
 				log.Printf("[TODO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
