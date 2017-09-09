@@ -79,7 +79,13 @@ func (store *BadgerIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
 		if key == nil {
 			break
 		}
-		val := item.Value()
+		var val []byte
+		if err = item.Value(func(v []byte) {
+			val = make([]byte, len(v))
+			copy(val, v)
+		}); err != nil {
+			return err
+		}
 
 		index := newBadgerKeylogIndex(store.baseBadger, key)
 		if err = index.load(val, item.Counter()); err == nil {
@@ -259,5 +265,14 @@ func (idx *BadgerKeylogIndex) reload() error {
 		return err
 	}
 
-	return idx.load(item.Value(), item.Counter())
+	var val []byte
+	err = item.Value(func(v []byte) {
+		val = make([]byte, len(v))
+		copy(val, v)
+	})
+	if err != nil {
+		return err
+	}
+
+	return idx.load(val, item.Counter())
 }
