@@ -11,10 +11,10 @@ import (
 func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	// Make sure we are part of the set.  We check this first as the leader call make rpc's
 	// which do not want to unnecessarily make.
-	sloc, err := locs.GetByHost(hlog.conf.Hostname)
-	if err != nil {
-		return err
-	}
+	// sloc, err := locs.GetByHost(hlog.conf.Hostname)
+	// if err != nil {
+	// 	return err
+	// }
 
 	leader, err := hlog.Leader(key, locs)
 	if err != nil {
@@ -31,15 +31,15 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	lloc := leader.Location()
 
 	// We are the leader, so nothing to do
-	if lloc.Host() == sloc.Host() {
+	if lloc.Host() == hlog.conf.Hostname {
 		return nil
 	}
 
-	_, err = hlog.store.GetKey(key)
+	keylog, err := hlog.store.GetKey(key)
 	if err != nil {
 		// Create new key
 		if err == hexatype.ErrKeyNotFound {
-			if _, err = hlog.store.NewKey(key); err != nil {
+			if keylog, err = hlog.store.NewKey(key); err != nil {
 				return err
 			}
 		} else {
@@ -48,15 +48,18 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	}
 
 	var (
-		h     = hlog.conf.Hasher.New()
-		llh   = lle.Hash(h)
-		slh   []byte
-		lasts = leader.Entries()
-		last  = lasts[sloc.Priority]
+		h   = hlog.conf.Hasher.New()
+		llh = lle.Hash(h)
+		slh []byte
+		//lasts = leader.Entries()
+		//last  = lasts[sloc.Priority]
+		last = keylog.LastEntry()
+		//lastID =
 	)
 
 	if last == nil {
 		last = &hexatype.Entry{Key: key, Height: 0}
+		//lastID = make([]byte, h.Size())
 		slh = make([]byte, h.Size())
 	} else {
 		h.Reset()

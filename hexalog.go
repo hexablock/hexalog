@@ -7,7 +7,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -290,15 +289,15 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 }
 
 // Heal submits a heal request for the given key.  It returns an error if the options are
-// invalid or if the node is not part of the set.
+// invalid.
 func (hlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
 	if err := hlog.checkOptions(opts); err != nil {
 		return err
 	}
-	locs := hexaring.LocationSet(opts.PeerSet)
-	if _, err := locs.GetByHost(hlog.conf.Hostname); err != nil {
-		return err
-	}
+	// locs := hexaring.LocationSet(opts.PeerSet)
+	// if _, err := locs.GetByHost(hlog.conf.Hostname); err != nil {
+	// 	return err
+	// }
 
 	ent := &hexatype.Entry{Key: key}
 	hlog.hch <- &hexatype.ReqResp{Options: opts, Entry: ent}

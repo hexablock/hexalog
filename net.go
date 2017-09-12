@@ -390,10 +390,6 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 		return hexatype.ErrKeyInvalid
 	}
 
-	// TODO:
-	// mark receiving
-	// defer unmark receiving
-
 	// Check for existence of the key locally
 	var keylog *Keylog
 	if keylog, err = trans.hlog.store.GetKey(req.Entry.Key); err != nil {

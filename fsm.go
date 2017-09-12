@@ -108,7 +108,7 @@ func (fsm *fsm) startApply() {
 		// encountered
 		e := mergeErrors(e1, e2)
 		fentry.applied(data, e)
-		log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'", entry.Key, entry.Height, fentry.Runtime(), e)
+		//log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'", entry.Key, entry.Height, fentry.Runtime(), e)
 	}
 
 }

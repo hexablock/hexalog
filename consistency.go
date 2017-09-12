@@ -2,6 +2,7 @@ package hexalog
 
 import (
 	"bytes"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -36,6 +37,18 @@ func (hlog *Hexalog) verifyEntry(entry *hexatype.Entry) (prevHeight uint32, err 
 	// TODO: verify signature
 	//
 
+	// Check the marker.  Continue if key not found as it may be the first entry for the key
+	kl, err := hlog.store.index.GetKey(entry.Key)
+	if err != nil {
+		if err != hexatype.ErrKeyNotFound {
+			return 0, err
+		}
+		err = nil
+		// Continue if key not found as it may be the first entry for the key
+	} else if kl.Marker() != nil {
+		return 0, fmt.Errorf("key degraded")
+	}
+
 	// Set the default last id to a zero hash
 	lastID := make([]byte, hlog.conf.Hasher.New().Size())
 	// Try to get the last entry
@@ -44,6 +57,9 @@ func (hlog *Hexalog) verifyEntry(entry *hexatype.Entry) (prevHeight uint32, err 
 		prevHeight = last.Height
 		lastID = last.Hash(hlog.conf.Hasher.New())
 	}
+
+	// TODO: CHeck keylog for marker.  if present fail the verification as we are not
+	// allowed to write via voting until the marker has been cleared.
 
 	// TODO: Re-visit
 	// Check height
