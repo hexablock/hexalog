@@ -36,9 +36,9 @@ func (store *InMemIndexStore) NewKey(key []byte) (KeylogIndex, error) {
 	return kli, nil
 }
 
-// UpsertKey creates a new log index for the given key if one does not exist and returns
-// it.  If the log index exists, it is simply returned
-func (store *InMemIndexStore) UpsertKey(key, marker []byte) (KeylogIndex, error) {
+// MarkKey sets the marker on the key key.  If the key does not exist a new one is created.
+// It returns the KeylogIndex or an error.
+func (store *InMemIndexStore) MarkKey(key, marker []byte) (KeylogIndex, error) {
 	k := string(key)
 	store.mu.RLock()
 	if v, ok := store.m[k]; ok {

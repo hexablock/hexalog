@@ -49,7 +49,7 @@ func TestBadgerIndexStore(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		if _, err = testBIdx.UpsertKey([]byte(fmt.Sprintf("key%d", i)), nil); err != nil {
+		if _, err = testBIdx.MarkKey([]byte(fmt.Sprintf("key%d", i)), nil); err != nil {
 			t.Fatal(err)
 		}
 	}

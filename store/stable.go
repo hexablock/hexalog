@@ -45,7 +45,8 @@ func (store *InMemStableStore) Set(key, value []byte) error {
 	return nil
 }
 
-// Iter iterates over each key issuing the callback for each key and entry pair
+// Iter iterates over each key issuing the callback for each key and entry pair. The keys
+// are not sorted.
 func (store *InMemStableStore) Iter(cb func([]byte, []byte) error) error {
 	var err error
 	store.mu.RLock()

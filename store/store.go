@@ -31,7 +31,7 @@ type IndexStore interface {
 	// Get a KeylogIndex from the store
 	GetKey(key []byte) (KeylogIndex, error)
 	// Create and/or get a KeylogIndex setting the marker if it is created.
-	UpsertKey(key []byte, marker []byte) (KeylogIndex, error)
+	MarkKey(key []byte, marker []byte) (KeylogIndex, error)
 	// Remove key if exists or return an error
 	RemoveKey(key []byte) error
 	// Iterate over each key

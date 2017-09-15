@@ -115,9 +115,9 @@ func (hlog *Hexalog) reapBallotsOnce() (c int) {
 			continue
 		}
 
-		props, commits := b.Proposals(), b.Commits()
-		log.Printf("[DEBUG] Ballot reaped key=%s id=%x proposals=%d commits=%d error='%v'",
-			b.fentry.Entry.Key, k, props, commits, b.Error())
+		// props, commits := b.Proposals(), b.Commits()
+		// log.Printf("[DEBUG] Ballot reaped key=%s id=%x proposals=%d commits=%d error='%v'",
+		//	b.fentry.Entry.Key, k, props, commits, b.Error())
 
 		delete(hlog.ballots, k)
 		c++

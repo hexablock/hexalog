@@ -50,9 +50,9 @@ func (store *BadgerIndexStore) GetKey(key []byte) (KeylogIndex, error) {
 	return ki, err
 }
 
-// UpsertKey creates a new log index for the given key if one does not exist and returns
-// it.  If the log index exists, it is simply returned
-func (store *BadgerIndexStore) UpsertKey(key []byte, marker []byte) (KeylogIndex, error) {
+// MarkKey sets the marker on the key key.  If the key does not exist a new one is created.
+// It returns the KeylogIndex or an error.
+func (store *BadgerIndexStore) MarkKey(key []byte, marker []byte) (KeylogIndex, error) {
 	ki, err := store.GetKey(key)
 	if err == hexatype.ErrKeyNotFound {
 		err = nil
