@@ -7,4 +7,4 @@ install:
   - make deps
 
 script:
-  - make test test-race
+  - make test-race
