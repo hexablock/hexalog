@@ -80,9 +80,10 @@ func (store *BadgerIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
 			break
 		}
 		var val []byte
-		if err = item.Value(func(v []byte) {
+		if err = item.Value(func(v []byte) error {
 			val = make([]byte, len(v))
 			copy(val, v)
+			return nil
 		}); err != nil {
 			return err
 		}
@@ -266,9 +267,10 @@ func (idx *BadgerKeylogIndex) reload() error {
 	}
 
 	var val []byte
-	err = item.Value(func(v []byte) {
+	err = item.Value(func(v []byte) error {
 		val = make([]byte, len(v))
 		copy(val, v)
+		return nil
 	})
 	if err != nil {
 		return err

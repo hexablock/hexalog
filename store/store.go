@@ -100,11 +100,12 @@ func (store *baseBadger) get(key []byte) ([]byte, uint64, error) {
 	}
 
 	var val []byte
-	err = item.Value(func(v []byte) {
+	err = item.Value(func(v []byte) error {
 		if v != nil {
 			val = make([]byte, len(v))
 			copy(val, v)
 		}
+		return nil
 	})
 
 	return val, item.Counter(), err

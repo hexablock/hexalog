@@ -109,9 +109,10 @@ func (store *BadgerStableStore) Iter(cb func([]byte, []byte) error) error {
 		}
 		//	 Skip nils
 		var val []byte
-		err = item.Value(func(v []byte) {
+		err = item.Value(func(v []byte) error {
 			val = make([]byte, len(v))
 			copy(val, v)
+			return nil
 		})
 
 		if err != nil {

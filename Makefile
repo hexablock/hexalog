@@ -2,8 +2,10 @@
 clean:
 	go clean -i ./...
 
+
 deps:
-	go get -d -v ./...
+	go get github.com/golang/dep/cmd/dep
+	dep ensure
 
 test:
 	go test -cover ./...
