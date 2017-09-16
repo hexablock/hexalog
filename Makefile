@@ -8,7 +8,7 @@ deps:
 	dep ensure
 
 test:
-	go test -cover ./...
+	go test -cover $(shell go list ./... | grep -v /vendor/)
 
 test-race:
 	go test -race ./...
