@@ -9,12 +9,12 @@ import (
 )
 
 func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
-	// Make sure we are part of the set.  We check this first as the leader call make rpc's
-	// which do not want to unnecessarily make.
-	// sloc, err := locs.GetByHost(hlog.conf.Hostname)
-	// if err != nil {
-	// 	return err
-	// }
+	// Make sure we are part of the set.  We check this first to avoid rpcs for
+	// the leader call
+	_, err := locs.GetByHost(hlog.conf.Hostname)
+	if err != nil {
+		return err
+	}
 
 	leader, err := hlog.Leader(key, locs)
 	if err != nil {
@@ -66,6 +66,7 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 		slh = last.Hash(h)
 	}
 
+	// Fetch if there is a mismatch.
 	if bytes.Compare(slh, llh) != 0 {
 		_, er := hlog.trans.FetchKeylog(lloc.Host(), last, nil)
 		return mergeErrors(err, er)

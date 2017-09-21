@@ -111,7 +111,8 @@ func (store *InMemIndexStore) sortedKeys() []string {
 // hexatype.KeylogIndex with a mutex for safety.  This index interface is meant to be
 // implemented based on the backend persistent store used.
 type InMemKeylogIndex struct {
-	mu  sync.RWMutex
+	mu sync.RWMutex
+	// in-mem index
 	idx *hexatype.KeylogIndex
 }
 
