@@ -13,7 +13,7 @@ type Config struct {
 	BroadcastBufSize   int             // proposal and commit broadcast buffer
 	BallotReapInterval time.Duration   // interval at which old ballots are cleaned up
 	TTL                time.Duration   // ttl for each ballot
-	Votes              int             // votes required
+	Votes              int             // minimum votes required
 	Hasher             hexatype.Hasher // hash function generator
 }
 

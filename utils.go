@@ -1,6 +1,8 @@
 package hexalog
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func mergeErrors(e1, e2 error) (err error) {
 	if e1 != nil && e2 != nil {

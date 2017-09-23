@@ -11,10 +11,10 @@ import (
 func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	// Make sure we are part of the set.  We check this first to avoid rpcs for
 	// the leader call
-	_, err := locs.GetByHost(hlog.conf.Hostname)
-	if err != nil {
-		return err
-	}
+	// _, err := locs.GetByHost(hlog.conf.Hostname)
+	// if err != nil {
+	// 	return err
+	// }
 
 	leader, err := hlog.Leader(key, locs)
 	if err != nil {
