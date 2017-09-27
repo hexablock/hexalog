@@ -18,21 +18,21 @@ import (
 var (
 	testOpts = &hexatype.RequestOptions{
 		PeerSet: []*hexaring.Location{
-			&hexaring.Location{ID: []byte("1"),
+			{ID: []byte("1"),
 				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:43211"}},
-			&hexaring.Location{ID: []byte("2"),
+			{ID: []byte("2"),
 				Vnode: &chord.Vnode{Id: []byte("2"), Host: "127.0.0.1:43212"}},
-			&hexaring.Location{ID: []byte("3"),
+			{ID: []byte("3"),
 				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:43213"}},
 		},
 	}
 	testOpts1 = &hexatype.RequestOptions{
 		PeerSet: []*hexaring.Location{
-			&hexaring.Location{ID: []byte("1"),
+			{ID: []byte("1"),
 				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:53211"}},
-			&hexaring.Location{ID: []byte("2"),
+			{ID: []byte("2"),
 				Vnode: &chord.Vnode{Id: []byte("2"), Host: "127.0.0.1:53212"}},
-			&hexaring.Location{ID: []byte("3"),
+			{ID: []byte("3"),
 				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:53213"}},
 		},
 	}
@@ -50,6 +50,22 @@ func (server *testServer) stop() {
 	server.ln.Close()
 }
 
+func initConf(addr string) *Config {
+	conf := DefaultConfig(addr)
+	conf.BallotReapInterval = 5 * time.Second
+	return conf
+}
+
+func initStorage() (*LogStore, *store.InMemStableStore, *EchoFSM) {
+	ss := &store.InMemStableStore{}
+
+	es := store.NewInMemEntryStore()
+	is := store.NewInMemIndexStore()
+	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
+
+	return ls, ss, &EchoFSM{}
+}
+
 func initTestServer(addr string) *testServer {
 	ln, _ := net.Listen("tcp", addr)
 	server := grpc.NewServer()
@@ -58,24 +74,13 @@ func initTestServer(addr string) *testServer {
 	trans := NewNetTransport(500*time.Millisecond, 3*time.Second)
 	RegisterHexalogRPCServer(server, trans)
 
-	ss := &store.InMemStableStore{}
-
-	es := store.NewInMemEntryStore()
-	is := store.NewInMemIndexStore()
-	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
-
-	hlog, _ := initHexalog(addr, ls, ss, trans)
+	ls, ss, fsm := initStorage()
+	conf := initConf(addr)
+	hlog, _ := NewHexalog(conf, fsm, ls, ss, trans)
 
 	go server.Serve(ln)
 
 	return &testServer{ln: ln, hlog: hlog, s: server}
-}
-
-func initHexalog(host string, ls *LogStore, ss StableStore, trans Transport) (*Hexalog, error) {
-	conf := DefaultConfig(host)
-	conf.BallotReapInterval = 5 * time.Second
-
-	return NewHexalog(conf, &EchoFSM{}, ls, ss, trans)
 }
 
 func TestMain(m *testing.M) {

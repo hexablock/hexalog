@@ -117,14 +117,13 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 		return nil, err
 	}
 
-	// Get our location index in the peerset
+	// Get our location index in the peerset and location
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
 		return nil, fmt.Errorf("%s not in peer set", hlog.conf.Hostname)
 	}
-
-	// our location
 	loc := opts.PeerSet[idx]
+
 	// entry id
 	id := entry.Hash(hlog.conf.Hasher.New())
 	// Verify entry
