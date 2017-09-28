@@ -36,12 +36,42 @@ var (
 				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:53213"}},
 		},
 	}
+	testOpts2 = &hexatype.RequestOptions{
+		PeerSet: []*hexaring.Location{
+			{
+				ID:    []byte("1"),
+				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:8997"},
+			},
+			{
+				ID:    []byte("2"),
+				Vnode: &chord.Vnode{Id: []byte("2"), Host: "127.0.0.1:9997"},
+			},
+			{
+				ID:    []byte("3"),
+				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:10997"},
+			},
+		},
+	}
 )
 
 type testServer struct {
-	s    *grpc.Server
-	ln   net.Listener
+	conf *Config
+
+	s  *grpc.Server
+	ln net.Listener
+
+	ss StableStore
+	es EntryStore
+	is IndexStore
+	ls *LogStore
+
+	fsm *EchoFSM
+
 	hlog *Hexalog
+}
+
+func (server *testServer) start() {
+	go server.s.Serve(server.ln)
 }
 
 func (server *testServer) stop() {
@@ -56,44 +86,83 @@ func initConf(addr string) *Config {
 	return conf
 }
 
-func initStorage() (*LogStore, *store.InMemStableStore, *EchoFSM) {
-	ss := &store.InMemStableStore{}
-
-	es := store.NewInMemEntryStore()
-	is := store.NewInMemIndexStore()
-	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
-
-	return ls, ss, &EchoFSM{}
+func (server *testServer) initStorage() {
+	server.ss = &store.InMemStableStore{}
+	server.es = store.NewInMemEntryStore()
+	server.is = store.NewInMemIndexStore()
+	server.ls = NewLogStore(server.es, server.is, server.conf.Hasher)
+	server.fsm = &EchoFSM{}
 }
 
 func initTestServer(addr string) *testServer {
-	ln, _ := net.Listen("tcp", addr)
-	server := grpc.NewServer()
+	ts := &testServer{}
+	ts.ln, _ = net.Listen("tcp", addr)
+	ts.s = grpc.NewServer()
+
+	ts.conf = initConf(addr)
 
 	// Set to low value to allow reaper testing
 	trans := NewNetTransport(500*time.Millisecond, 3*time.Second)
-	RegisterHexalogRPCServer(server, trans)
+	RegisterHexalogRPCServer(ts.s, trans)
 
-	ls, ss, fsm := initStorage()
-	conf := initConf(addr)
-	hlog, _ := NewHexalog(conf, fsm, ls, ss, trans)
+	ts.initStorage()
 
-	go server.Serve(ln)
+	ts.hlog, _ = NewHexalog(ts.conf, ts.fsm, ts.ls, ts.ss, trans)
 
-	return &testServer{ln: ln, hlog: hlog, s: server}
+	ts.start()
+
+	return ts
 }
 
 func TestMain(m *testing.M) {
-	log.SetLevel("DEBUG")
+	//log.SetLevel("DEBUG")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	os.Exit(m.Run())
 }
 
-func TestHexalogShutdown(t *testing.T) {
+func TestHexalog(t *testing.T) {
 	ts1 := initTestServer("127.0.0.1:8997")
 	ts2 := initTestServer("127.0.0.1:9997")
 	ts3 := initTestServer("127.0.0.1:10997")
 	<-time.After(1 * time.Second)
+
+	testkey := []byte("hexalog-key")
+	testdata := []byte("hexalog-data")
+	ent1 := ts1.hlog.New(testkey)
+	ent1.Data = testdata
+	i1 := ent1.Hash(ts1.conf.Hasher.New())
+
+	ballot, err := ts2.hlog.Propose(ent1, testOpts2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = ballot.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	fut := ballot.Future()
+	if _, err = fut.Wait(400 * time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = ts1.es.Get(i1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = ts2.es.Get(i1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = ts3.es.Get(i1); err != nil {
+		t.Fatal(err)
+	}
+
+	leader, err := ts2.hlog.Leader(testkey, testOpts2.PeerSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ok, _ := leader.IsConsistent(); !ok {
+		t.Fatal("should be consistent")
+	}
 
 	ts1.hlog.Shutdown()
 	ts2.hlog.Shutdown()

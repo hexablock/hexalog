@@ -26,7 +26,7 @@ func DefaultConfig(hostname string) *Config {
 		HealBufSize:        32,
 		BallotReapInterval: 30 * time.Second,
 		TTL:                3 * time.Second,
-		Votes:              3,
-		Hasher:             &hexatype.SHA1Hasher{},
+		Votes:              3,                      // Minimum votes
+		Hasher:             &hexatype.SHA1Hasher{}, // hash function
 	}
 }

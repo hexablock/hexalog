@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 )
 
@@ -16,16 +15,16 @@ var (
 // a key.
 type Keylog struct {
 	// Datastore containing entries
-	entries store.EntryStore
+	entries EntryStore
 	// KeylogIndex interface
-	idx store.KeylogIndex
+	idx hexatype.KeylogIndex
 	// Hash function
 	hasher hexatype.Hasher
 }
 
 // NewKeylog initializes a new log for a key. It takes a key, location id and hash function used
 // to compute hash id's of log entries.
-func NewKeylog(entries store.EntryStore, idx store.KeylogIndex, hasher hexatype.Hasher) *Keylog {
+func NewKeylog(entries EntryStore, idx hexatype.KeylogIndex, hasher hexatype.Hasher) *Keylog {
 	return &Keylog{
 		hasher:  hasher,
 		entries: entries,
@@ -115,6 +114,6 @@ func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry
 }
 
 // GetIndex returns a hexatype.KeylogIndex struct
-func (keylog *Keylog) GetIndex() hexatype.KeylogIndex {
+func (keylog *Keylog) GetIndex() hexatype.UnsafeKeylogIndex {
 	return keylog.idx.Index()
 }

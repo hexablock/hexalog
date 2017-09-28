@@ -55,7 +55,7 @@ func TestBadgerIndexStore(t *testing.T) {
 	}
 
 	var cnt int
-	if err = testBIdx.Iter(func(key []byte, idx KeylogIndex) error {
+	if err = testBIdx.Iter(func(key []byte, idx hexatype.KeylogIndex) error {
 		cnt++
 		return nil
 	}); err != nil {

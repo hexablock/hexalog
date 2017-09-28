@@ -22,7 +22,7 @@ func NewBadgerIndexStore(dataDir string) *BadgerIndexStore {
 }
 
 // NewKey creates a new KeylogIndex.  It gets added to the store on the first write
-func (store *BadgerIndexStore) NewKey(key []byte) (KeylogIndex, error) {
+func (store *BadgerIndexStore) NewKey(key []byte) (hexatype.KeylogIndex, error) {
 	ok, err := store.kv.Exists(key)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (store *BadgerIndexStore) NewKey(key []byte) (KeylogIndex, error) {
 }
 
 // GetKey gets a KeylogIndex from the store
-func (store *BadgerIndexStore) GetKey(key []byte) (KeylogIndex, error) {
+func (store *BadgerIndexStore) GetKey(key []byte) (hexatype.KeylogIndex, error) {
 	val, c, err := store.get(key)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (store *BadgerIndexStore) GetKey(key []byte) (KeylogIndex, error) {
 
 // MarkKey sets the marker on the key key.  If the key does not exist a new one is created.
 // It returns the KeylogIndex or an error.
-func (store *BadgerIndexStore) MarkKey(key []byte, marker []byte) (KeylogIndex, error) {
+func (store *BadgerIndexStore) MarkKey(key []byte, marker []byte) (hexatype.KeylogIndex, error) {
 	ki, err := store.GetKey(key)
 	if err == hexatype.ErrKeyNotFound {
 		err = nil
@@ -67,7 +67,7 @@ func (store *BadgerIndexStore) MarkKey(key []byte, marker []byte) (KeylogIndex, 
 }
 
 // Iter iterates over each key
-func (store *BadgerIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
+func (store *BadgerIndexStore) Iter(cb func([]byte, hexatype.KeylogIndex) error) error {
 	opt := new(badger.IteratorOptions)
 	*opt = badger.DefaultIteratorOptions
 	iter := store.kv.NewIterator(*opt)
@@ -120,15 +120,15 @@ type BadgerKeylogIndex struct {
 	key []byte
 
 	mu  sync.RWMutex
-	c   uint64                // cas counter
-	idx *hexatype.KeylogIndex // in-memory index
+	c   uint64                      // cas counter
+	idx *hexatype.UnsafeKeylogIndex // in-memory index
 }
 
 func newBadgerKeylogIndex(bb *baseBadger, key []byte) *BadgerKeylogIndex {
 	return &BadgerKeylogIndex{
 		baseBadger: bb,
 		key:        key,
-		idx:        hexatype.NewKeylogIndex(key),
+		idx:        hexatype.NewUnsafeKeylogIndex(key),
 	}
 }
 
@@ -180,7 +180,7 @@ func (idx *BadgerKeylogIndex) Height() uint32 {
 }
 
 // Index returns the KeylogIndex instance.  This is mean to be used as a readonly snapshot
-func (idx *BadgerKeylogIndex) Index() hexatype.KeylogIndex {
+func (idx *BadgerKeylogIndex) Index() hexatype.UnsafeKeylogIndex {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	return *idx.idx
@@ -247,7 +247,7 @@ func (idx *BadgerKeylogIndex) commit(reload bool) error {
 }
 
 func (idx *BadgerKeylogIndex) load(val []byte, c uint64) error {
-	var index hexatype.KeylogIndex
+	var index hexatype.UnsafeKeylogIndex
 	if err := proto.Unmarshal(val, &index); err != nil {
 		return err
 	}

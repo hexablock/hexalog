@@ -3,24 +3,46 @@ package hexalog
 import (
 	"time"
 
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
+
+// IndexStore implements a datastore for the log indexes.  It contains all keys on a node
+// with their associated keylog.  The interface must be thread-safe
+type IndexStore interface {
+	// Create a new KeylogIndex and add it to the store.
+	NewKey(key []byte) (hexatype.KeylogIndex, error)
+	// Get a KeylogIndex from the store
+	GetKey(key []byte) (hexatype.KeylogIndex, error)
+	// Create and/or get a KeylogIndex setting the marker if it is created.
+	MarkKey(key []byte, marker []byte) (hexatype.KeylogIndex, error)
+	// Remove key if exists or return an error
+	RemoveKey(key []byte) error
+	// Iterate over each key
+	Iter(cb func(key []byte, kli hexatype.KeylogIndex) error) error
+}
+
+// EntryStore implements a datastore for log entries.
+type EntryStore interface {
+	Get(id []byte) (*hexatype.Entry, error)
+	Set(id []byte, entry *hexatype.Entry) error
+	Delete(id []byte) error
+	Close() error
+}
 
 // LogStore is the whole log containing all keys.  It manages serialization of
 // operations and all validation and checks required therein.
 type LogStore struct {
 	// KeylogIndex datastore interface
-	index store.IndexStore
+	index IndexStore
 	// Entry datastore interface
-	entries store.EntryStore
+	entries EntryStore
 	// Hash function to use when calculating id's
 	hasher hexatype.Hasher
 }
 
 // NewLogStore initializes a new in-memory log store
-func NewLogStore(entries store.EntryStore, index store.IndexStore, hasher hexatype.Hasher) *LogStore {
+func NewLogStore(entries EntryStore, index IndexStore, hasher hexatype.Hasher) *LogStore {
 	return &LogStore{
 		hasher:  hasher,
 		entries: entries,
@@ -141,9 +163,3 @@ func (hlog *LogStore) AppendEntry(entry *hexatype.Entry) error {
 	}
 	return err
 }
-
-// Iter iterates over all keys in the store issueing the callback with the key and location
-// id.  It acquires a read-lock and should be used keeping that in mind
-// func (hlog *LogStore) Iter(cb func(string, []byte) error) error {
-// 	return hlog.index.Iter(cb)
-// }

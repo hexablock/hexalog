@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -31,7 +30,8 @@ type StableStore interface {
 	Close() error
 }
 
-// EchoFSM implements the FSM interface that simply echos the entry to stdout.
+// EchoFSM implements the FSM interface that simply echos the entry to stdout. It
+// exists simplying for testing and debug purposes.
 type EchoFSM struct{}
 
 // Apply simply logs the Entry to stdout
@@ -104,8 +104,8 @@ func (fsm *fsm) startApply() {
 		}
 		// Commit the last fsm applied entry to stable store
 		e2 := fsm.ss.Set(entry.Key, fentry.ID())
-		// Signal future that we applied the entry supplying the app fsm response or any errors
-		// encountered
+		// Signal future that we applied the entry supplying the app fsm response or any
+		// errors encountered
 		e := mergeErrors(e1, e2)
 		fentry.applied(data, e)
 		//log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'", entry.Key, entry.Height, fentry.Runtime(), e)
@@ -117,7 +117,7 @@ func (fsm *fsm) startApply() {
 // submits entries to be applied to the fsm where it left off
 func (fsm *fsm) check() error {
 	log.Printf("[INFO] Validating FSM against hexalog")
-	return fsm.ls.index.Iter(func(key []byte, ki store.KeylogIndex) error {
+	return fsm.ls.index.Iter(func(key []byte, ki hexatype.KeylogIndex) error {
 		// Last local entry for key
 		last := ki.Last()
 		seek, err := fsm.ss.Get(key)
