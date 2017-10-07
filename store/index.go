@@ -96,6 +96,14 @@ func (store *InMemIndexStore) Iter(cb func([]byte, hexatype.KeylogIndex) error) 
 	return nil
 }
 
+// KeyCount returns the total number of keys in the index
+func (store *InMemIndexStore) KeyCount() int {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	return len(store.m)
+}
+
 func (store *InMemIndexStore) sortedKeys() []string {
 	keys := make([]string, len(store.m))
 	var i int

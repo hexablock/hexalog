@@ -164,6 +164,8 @@ func TestHexalog(t *testing.T) {
 		t.Fatal("should be consistent")
 	}
 
+	t.Logf("%+v", ts2.hlog.Stats())
+
 	ts1.hlog.Shutdown()
 	ts2.hlog.Shutdown()
 	ts3.hlog.Shutdown()

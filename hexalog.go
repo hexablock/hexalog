@@ -11,6 +11,17 @@ import (
 	"github.com/hexablock/log"
 )
 
+// Stats contains various pieces of information regarding the current
+// state of the log
+type Stats struct {
+	Keys      int
+	Entries   int
+	Ballots   int
+	Proposals int
+	Commits   int
+	Heals     int
+}
+
 // Transport implements a Hexalog network transport
 type Transport interface {
 	// Gets an entry from a remote host
@@ -49,9 +60,9 @@ type Hexalog struct {
 	pch chan *hexatype.ReqResp
 	// Commit broadcast channel to broadcast commits to the network peer set
 	cch chan *hexatype.ReqResp
-	// Channel for heal requests.  When previous hash mismatches occur, the log will send a
-	// request down this channel to allow applications to try to recover. This is usually
-	// the case when a keylog falls behind.
+	// Channel for heal requests.  When previous hash mismatches occur, the log will send
+	// a request down this channel to allow applications to try to recover. This is
+	// usually the case when a keylog falls behind.
 	hch chan *hexatype.ReqResp
 	// Gets set when once a shutdown is signalled
 	shutdown int32
@@ -82,8 +93,8 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		shutdownCh: make(chan struct{}, 4),
 	}
 
-	// Check to make sure the fsm has all the entries in the log applied.  If not then submit
-	// the remaining entries to be applied to the fsm.
+	// Check to make sure the fsm has all the entries in the log applied.  If not then
+	// submit the remaining entries to be applied to the fsm.
 	if err = hlog.fsm.check(); err != nil {
 		return nil, err
 	}
@@ -92,6 +103,17 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 	hlog.start()
 
 	return hlog, nil
+}
+
+// Stats returns internal information of the log regarding its current activity
+func (hlog *Hexalog) Stats() *Stats {
+	stats := hlog.store.Stats()
+	stats.Ballots = len(hlog.ballots)
+	stats.Proposals = len(hlog.pch)
+	stats.Commits = len(hlog.cch)
+	stats.Heals = len(hlog.hch)
+
+	return stats
 }
 
 func (hlog *Hexalog) start() {
