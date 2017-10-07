@@ -3,39 +3,27 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/AndreasBriese/bbloom"
-  packages = ["."]
-  revision = "28f7e881ca57bc00e028f9ede9f0d9104cfeef5e"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/dgraph-io/badger"
-  packages = [".","options","protos","skl","table","y"]
-  revision = "935ef5ddf169f2bb3fa1d2a44144e07f1538197c"
-
-[[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
-  revision = "11b8df160996e00fd4b55cbaafb3d84ec6d50fa8"
+  revision = "130e6b02ab059e7b717a096f397c5b60111cae74"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/go-chord"
   packages = [".","coordinate"]
-  revision = "7bfc0487db0fc96387641430ba27b3f719f76b7d"
+  revision = "d0f2d560a5bc586e4b7fedb8b62475b262e13889"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/hexaring"
   packages = ["."]
-  revision = "b34f07f68cb4ad2816ea4346b0e2108cce336eaf"
+  revision = "28a4b6299ad96fc04d4b1cf797466b7d4deaf21d"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/hexatype"
   packages = ["."]
-  revision = "60b94ac10a9fcd05bdb9a276fbfe1d2a2512b6cf"
+  revision = "1f320aed14576ce82f35e460056260dd899698cf"
 
 [[projects]]
   branch = "master"
@@ -50,28 +38,16 @@
   revision = "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4"
 
 [[projects]]
-  name = "github.com/pkg/errors"
-  packages = ["."]
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
-
-[[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "8351a756f30f1297fe94bbf4b767ec589c6ea6d0"
-
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/sys"
-  packages = ["unix"]
-  revision = "062cd7e4e68206d8bab9b18396626e855c992658"
+  revision = "a04bdaca5b32abe1c069418fb7088ae607de5bd0"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
-  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "1cbadb444a806fd9430d14ad08967ed91da4fa0a"
+  packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
+  revision = "bd91bbf73e9a4a801adbfb97133c992678533126"
 
 [[projects]]
   branch = "master"
@@ -80,14 +56,14 @@
   revision = "595979c8a7bf586b2d293fb42246bf91a0b893d9"
 
 [[projects]]
+  branch = "master"
   name = "google.golang.org/grpc"
-  packages = [".","codes","connectivity","credentials","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
-  revision = "f92cdcd7dcdc69e81b2d7b338479a19a8723cfa3"
-  version = "v1.6.0"
+  packages = [".","balancer","codes","connectivity","credentials","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","stats","status","tap","transport"]
+  revision = "3214f767e5a22021f792f7c4625a6380ce1eb2b2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4cbcad69820fbe4ca8ae551c67287fae62a90bb4417688a547b59fca21c55ff1"
+  inputs-digest = "340d9646447230d465c9bcf8f7d47f46acd1d94a439d9d9b3dc464b4bdfaf690"
   solver-name = "gps-cdcl"
   solver-version = 1

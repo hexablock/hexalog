@@ -23,10 +23,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/dgraph-io/badger"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/golang/protobuf"
 
 [[constraint]]
@@ -50,5 +46,5 @@
   name = "golang.org/x/net"
 
 [[constraint]]
+  branch = "master"
   name = "google.golang.org/grpc"
-  version = "1.6.0"
