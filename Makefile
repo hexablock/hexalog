@@ -1,7 +1,7 @@
 
 clean:
 	go clean -i ./...
-
+	rm -rf vendor/
 
 deps:
 	go get github.com/golang/dep/cmd/dep
