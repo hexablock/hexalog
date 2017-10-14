@@ -46,6 +46,8 @@ type Transport interface {
 // all other aspects pertaining to consistency
 type Hexalog struct {
 	conf *Config
+	// Lamport clock
+	ltime *hexatype.LamportClock
 	// Internal fsm.  This wraps the application FSM from the config
 	fsm *fsm
 	// Underlying transport
@@ -90,6 +92,7 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		cch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
 		hch:        make(chan *hexatype.ReqResp, conf.HealBufSize),
 		store:      logstore,
+		ltime:      &hexatype.LamportClock{},
 		shutdownCh: make(chan struct{}, 4),
 	}
 
@@ -117,6 +120,8 @@ func (hlog *Hexalog) Stats() *Stats {
 }
 
 func (hlog *Hexalog) start() {
+	// Increment LamportClock on start
+	hlog.ltime.Increment()
 	// Register Hexalog to the transport to handle RPC requests
 	hlog.trans.Register(hlog)
 
@@ -214,6 +219,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 
 			// Broadcast proposal
 			hlog.pch <- &hexatype.ReqResp{Entry: entry, Options: opts}
+			hlog.ltime.Increment()
 		}
 
 	} else {
@@ -223,15 +229,14 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 	vid := opts.SourcePeer().Vnode.Id
 	pvotes, err := ballot.votePropose(id, string(vid))
 
-	log.Printf("[DEBUG] Propose host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
+	log.Printf("[DEBUG] Propose ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
 
 	if err != nil {
 		return ballot, err
 	}
 
 	if pvotes == 1 {
-
 		// Create a new key if height is 0 and we don't have the key
 		if prevHeight == 0 {
 			if _, er := hlog.store.GetKey(entry.Key); er != nil {
@@ -241,8 +246,9 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 				}
 			}
 		}
-
+		// Broadcast proposal
 		hlog.pch <- &hexatype.ReqResp{Entry: entry, Options: opts}
+		hlog.ltime.Increment()
 
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
@@ -295,8 +301,8 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 	sloc := opts.SourcePeer()
 	vid := sloc.Vnode.Id
 	votes, err := ballot.voteCommit(id, string(vid))
-	log.Printf("[DEBUG] Commit host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
+	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
 	// We do not rollback here as we could have a faulty voter trying to commit without
 	// having a proposal.
