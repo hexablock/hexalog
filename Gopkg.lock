@@ -23,7 +23,7 @@
   branch = "master"
   name = "github.com/hexablock/hexatype"
   packages = ["."]
-  revision = "1f320aed14576ce82f35e460056260dd899698cf"
+  revision = "02d68deefd714b75e89142f914f1382b076e4d21"
 
 [[projects]]
   branch = "master"
@@ -46,24 +46,24 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
-  packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "bd91bbf73e9a4a801adbfb97133c992678533126"
+  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
+  revision = "c01e4764d870b77f8abe5096ee19ad20d80e8075"
 
 [[projects]]
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "595979c8a7bf586b2d293fb42246bf91a0b893d9"
+  revision = "f676e0f3ac6395ff1a529ae59a6670878a8371a6"
 
 [[projects]]
-  branch = "master"
   name = "google.golang.org/grpc"
   packages = [".","balancer","codes","connectivity","credentials","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","stats","status","tap","transport"]
-  revision = "3214f767e5a22021f792f7c4625a6380ce1eb2b2"
+  revision = "f7bf885db0b7479a537ec317c6e48ce53145f3db"
+  version = "v1.7.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "340d9646447230d465c9bcf8f7d47f46acd1d94a439d9d9b3dc464b4bdfaf690"
+  inputs-digest = "57a01affe789b1c26778a7563fcaea8de632c526dcdbf4d0dc49bd6dcb5ecd0f"
   solver-name = "gps-cdcl"
   solver-version = 1
