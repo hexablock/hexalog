@@ -35,7 +35,7 @@ func TestNetTransport(t *testing.T) {
 	<-time.After(50 * time.Millisecond)
 
 	id := entry.Hash(s1.hlog.conf.Hasher.New())
-	e2, err := s1.hlog.trans.GetEntry("127.0.0.1:43212", []byte("testkey"), id, &hexatype.RequestOptions{})
+	e2, err := s1.hlog.trans.GetEntry("127.0.0.1:43212", []byte("testkey"), id, &RequestOptions{})
 	if err != nil {
 		t.Fatalf("key=testkey id=%x %v", id, err)
 	}
@@ -49,7 +49,7 @@ func TestNetTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := &hexatype.RequestOptions{}
+	opts := &RequestOptions{}
 
 	if err = s1.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("testkey"), opts); err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestNetTransport(t *testing.T) {
 
 	//s4.hlog.trans.FetchKeylog("127.0.0.1:43212", entry)
 
-	l2, err := s2.hlog.trans.LastEntry("127.0.0.1:43213", []byte("testkey"), &hexatype.RequestOptions{})
+	l2, err := s2.hlog.trans.LastEntry("127.0.0.1:43213", []byte("testkey"), &RequestOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

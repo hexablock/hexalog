@@ -11,23 +11,23 @@ import (
 // with their associated keylog.  The interface must be thread-safe
 type IndexStore interface {
 	// Create a new KeylogIndex and add it to the store.
-	NewKey(key []byte) (hexatype.KeylogIndex, error)
+	NewKey(key []byte) (KeylogIndex, error)
 	// Get a KeylogIndex from the store
-	GetKey(key []byte) (hexatype.KeylogIndex, error)
+	GetKey(key []byte) (KeylogIndex, error)
 	// Create and/or get a KeylogIndex setting the marker if it is created.
-	MarkKey(key []byte, marker []byte) (hexatype.KeylogIndex, error)
+	MarkKey(key []byte, marker []byte) (KeylogIndex, error)
 	// Remove key if exists or return an error
 	RemoveKey(key []byte) error
 	// Iterate over each key
-	Iter(cb func(key []byte, kli hexatype.KeylogIndex) error) error
+	Iter(cb func(key []byte, kli KeylogIndex) error) error
 	// Total number of keys in the index
 	KeyCount() int
 }
 
 // EntryStore implements a datastore for log entries.
 type EntryStore interface {
-	Get(id []byte) (*hexatype.Entry, error)
-	Set(id []byte, entry *hexatype.Entry) error
+	Get(id []byte) (*Entry, error)
+	Set(id []byte, entry *Entry) error
 	Delete(id []byte) error
 	Count() int
 	Close() error
@@ -63,12 +63,12 @@ func (hlog *LogStore) NewKey(key []byte) (keylog *Keylog, err error) {
 }
 
 // GetEntry gets an entry by key and id of the entry
-func (hlog *LogStore) GetEntry(key, id []byte) (*hexatype.Entry, error) {
+func (hlog *LogStore) GetEntry(key, id []byte) (*Entry, error) {
 	return hlog.entries.Get(id)
 }
 
 // LastEntry gets the last entry for a key form the log
-func (hlog *LogStore) LastEntry(key []byte) *hexatype.Entry {
+func (hlog *LogStore) LastEntry(key []byte) *Entry {
 	idx, err := hlog.index.GetKey(key)
 	if err != nil {
 		return nil
@@ -84,7 +84,7 @@ func (hlog *LogStore) LastEntry(key []byte) *hexatype.Entry {
 }
 
 // NewEntry sets the previous hash and height for a new Entry and returns it
-func (hlog *LogStore) NewEntry(key []byte) *hexatype.Entry {
+func (hlog *LogStore) NewEntry(key []byte) *Entry {
 	var (
 		prev   []byte
 		height uint32
@@ -101,7 +101,7 @@ func (hlog *LogStore) NewEntry(key []byte) *hexatype.Entry {
 		height = 1
 	}
 
-	return &hexatype.Entry{
+	return &Entry{
 		Key:       key,
 		Previous:  prev,
 		Height:    height,
@@ -111,7 +111,7 @@ func (hlog *LogStore) NewEntry(key []byte) *hexatype.Entry {
 
 // RollbackEntry rolls the log back to the given entry.  The entry must be the last entry in
 // the log
-func (hlog *LogStore) RollbackEntry(entry *hexatype.Entry) error {
+func (hlog *LogStore) RollbackEntry(entry *Entry) error {
 	keylog, err := hlog.GetKey(entry.Key)
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (hlog *LogStore) RemoveKey(key []byte) error {
 	}
 
 	if err = hlog.index.RemoveKey(key); err == nil {
-		err = keylog.Iter(nil, func(id []byte, entry *hexatype.Entry) error {
+		err = keylog.Iter(nil, func(id []byte, entry *Entry) error {
 			//
 			// TODO: Schedule removal of all log entries for the key
 			//
@@ -159,7 +159,7 @@ func (hlog *LogStore) RemoveKey(key []byte) error {
 }
 
 // AppendEntry appends an entry to a KeyLog.  If the key does not exist it returns an error
-func (hlog *LogStore) AppendEntry(entry *hexatype.Entry) error {
+func (hlog *LogStore) AppendEntry(entry *Entry) error {
 	keylog, err := hlog.GetKey(entry.Key)
 	if err == nil {
 		return keylog.AppendEntry(entry)

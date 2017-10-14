@@ -1,4 +1,4 @@
-package store
+package hexalog
 
 import (
 	"sync"
@@ -9,16 +9,16 @@ import (
 // InMemEntryStore is an in-memory implementation of an EntryStore
 type InMemEntryStore struct {
 	mu sync.RWMutex
-	m  map[string]*hexatype.Entry
+	m  map[string]*Entry
 }
 
 // NewInMemEntryStore creates a new in memory EntryStore initializing the internal map
 func NewInMemEntryStore() *InMemEntryStore {
-	return &InMemEntryStore{m: make(map[string]*hexatype.Entry)}
+	return &InMemEntryStore{m: make(map[string]*Entry)}
 }
 
 // Get tries to get an entry by or returns an error
-func (store *InMemEntryStore) Get(id []byte) (*hexatype.Entry, error) {
+func (store *InMemEntryStore) Get(id []byte) (*Entry, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -30,7 +30,7 @@ func (store *InMemEntryStore) Get(id []byte) (*hexatype.Entry, error) {
 }
 
 // Set sets the entry in the store by the given id.  It returns no errors
-func (store *InMemEntryStore) Set(id []byte, entry *hexatype.Entry) error {
+func (store *InMemEntryStore) Set(id []byte, entry *Entry) error {
 	store.mu.Lock()
 	store.m[string(id)] = entry
 	store.mu.Unlock()

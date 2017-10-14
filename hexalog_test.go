@@ -11,12 +11,11 @@ import (
 	chord "github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
-	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
 var (
-	testOpts = &hexatype.RequestOptions{
+	testOpts = &RequestOptions{
 		PeerSet: []*hexaring.Location{
 			{ID: []byte("1"),
 				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:43211"}},
@@ -26,7 +25,7 @@ var (
 				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:43213"}},
 		},
 	}
-	testOpts1 = &hexatype.RequestOptions{
+	testOpts1 = &RequestOptions{
 		PeerSet: []*hexaring.Location{
 			{ID: []byte("1"),
 				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:53211"}},
@@ -36,7 +35,7 @@ var (
 				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:53213"}},
 		},
 	}
-	testOpts2 = &hexatype.RequestOptions{
+	testOpts2 = &RequestOptions{
 		PeerSet: []*hexaring.Location{
 			{
 				ID:    []byte("1"),
@@ -88,8 +87,8 @@ func initConf(addr string) *Config {
 
 func (server *testServer) initStorage() {
 	server.ss = &store.InMemStableStore{}
-	server.es = store.NewInMemEntryStore()
-	server.is = store.NewInMemIndexStore()
+	server.es = NewInMemEntryStore()
+	server.is = NewInMemIndexStore()
 	server.ls = NewLogStore(server.es, server.is, server.conf.Hasher)
 	server.fsm = &EchoFSM{}
 }
@@ -115,7 +114,7 @@ func initTestServer(addr string) *testServer {
 }
 
 func TestMain(m *testing.M) {
-	//log.SetLevel("DEBUG")
+	log.SetLevel("DEBUG")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	os.Exit(m.Run())
 }

@@ -1,4 +1,4 @@
-package store
+package hexalog
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 
 func TestInMemEntryStore(t *testing.T) {
 	entries := NewInMemEntryStore()
-	if err := entries.Set([]byte("id1"), &hexatype.Entry{Key: []byte("key1")}); err != nil {
+	if err := entries.Set([]byte("id1"), &Entry{Key: []byte("key1")}); err != nil {
 		t.Fatal(err)
 	}
 	if entries.Count() != 1 {

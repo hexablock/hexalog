@@ -58,8 +58,7 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	)
 
 	if last == nil {
-		last = &hexatype.Entry{Key: key, Height: 0}
-		//lastID = make([]byte, h.Size())
+		last = &Entry{Key: key, Height: 0}
 		slh = make([]byte, h.Size())
 	} else {
 		h.Reset()

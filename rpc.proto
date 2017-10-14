@@ -2,14 +2,60 @@ syntax = "proto3";
 
 package hexalog;
 
-import "github.com/hexablock/hexatype/types.proto";
+//import "github.com/hexablock/hexatype/types.proto";
+import "github.com/hexablock/hexaring/structs.proto";
 
 service HexalogRPC {
-    rpc ProposeRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
-    rpc CommitRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
-    rpc NewRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
-    rpc GetRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
-    rpc LastRPC(hexatype.ReqResp) returns (hexatype.ReqResp) {}
-    rpc TransferKeylogRPC(stream hexatype.ReqResp) returns (stream hexatype.ReqResp) {}
-    rpc FetchKeylogRPC(stream hexatype.ReqResp) returns (stream hexatype.ReqResp) {}
+    rpc ProposeRPC(ReqResp) returns (ReqResp) {}
+    rpc CommitRPC(ReqResp) returns (ReqResp) {}
+    rpc NewRPC(ReqResp) returns (ReqResp) {}
+    rpc GetRPC(ReqResp) returns (ReqResp) {}
+    rpc LastRPC(ReqResp) returns (ReqResp) {}
+    rpc TransferKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
+    rpc FetchKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
+}
+
+// Hexalog entry
+message Entry {
+    bytes Previous = 1;
+    uint64 Timestamp = 2;
+    uint32 Height = 3;
+    bytes Key = 4;
+    bytes Data = 5;
+}
+
+message UnsafeKeylogIndex {
+    bytes Key = 1;              // key for the index
+    uint32 Height = 2;          // Current height of the keylog
+    bytes Marker = 3;           // this is used to mark incomplete or whatever
+    repeated bytes Entries = 4; // entry ids
+}
+
+// Request and response shared structure for hexalog
+message ReqResp {
+    // ID is based on the request/response
+    bytes ID = 1;
+    Entry Entry = 2;
+    RequestOptions Options = 3;
+}
+
+// Hexalog request options
+message RequestOptions {
+    // Index of the source in the PeerSet.  This is set internally by the log
+    int32 SourceIndex = 1;
+    // Set of peers for the request.
+    repeated hexaring.Location PeerSet = 2;
+    // Number of times to retry for a given request
+    int32 Retries = 3;
+    // Retry interval for entry proposals
+    int32 RetryInterval = 4;
+    // Wait on ballot before returning
+    bool WaitBallot = 5;
+    // Wait for fsm to apply entry after ballot is closed. This should take
+    // effect only if WaitBallot is also true
+    bool WaitApply = 6;
+    // Apply timeout in ms.  This only takes effect if WaitApply is also set
+    int32 WaitApplyTimeout = 7;
+    // Lamport time
+    uint64 LTime = 8;
 }

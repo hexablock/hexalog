@@ -12,7 +12,7 @@ import (
 var testEID = []byte("test-id")
 
 func TestBallot_votePropose(t *testing.T) {
-	e1 := &hexatype.Entry{Key: []byte("key"), Height: 1}
+	e1 := &Entry{Key: []byte("key"), Height: 1}
 	fe1 := NewFutureEntry(testEID, e1)
 	ballot := newBallot(fe1, 3, 1*time.Second)
 	for i := 0; i < 3; i++ {
@@ -26,7 +26,7 @@ func TestBallot_votePropose(t *testing.T) {
 		t.Fatalf("proposal mismatch want=3 have=%d", ballot.Proposals())
 	}
 
-	e2 := &hexatype.Entry{Key: []byte("key"), Height: 2}
+	e2 := &Entry{Key: []byte("key"), Height: 2}
 	fe2 := NewFutureEntry(testEID, e2)
 	b2 := newBallot(fe2, 3, 1*time.Second)
 	_, err := b2.votePropose(testEID, "voter")
@@ -50,7 +50,7 @@ func TestBallot_voteCommit(t *testing.T) {
 	ttl := 1 * time.Second
 	votes := 3
 
-	e1 := &hexatype.Entry{Key: []byte("key"), Height: 1}
+	e1 := &Entry{Key: []byte("key"), Height: 1}
 	fe1 := NewFutureEntry(testEID, e1)
 	b1 := newBallot(fe1, votes, ttl)
 	for i := 0; i < votes; i++ {
@@ -80,7 +80,7 @@ func TestBallot_voteCommit(t *testing.T) {
 		t.Error("id's should match")
 	}
 
-	e2 := &hexatype.Entry{Key: []byte("key"), Height: 2}
+	e2 := &Entry{Key: []byte("key"), Height: 2}
 	fe2 := NewFutureEntry(testEID, e2)
 	b2 := newBallot(fe2, votes, ttl)
 	for i := 0; i < votes-1; i++ {

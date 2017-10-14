@@ -17,14 +17,14 @@ type Keylog struct {
 	// Datastore containing entries
 	entries EntryStore
 	// KeylogIndex interface
-	idx hexatype.KeylogIndex
+	idx KeylogIndex
 	// Hash function
 	hasher hexatype.Hasher
 }
 
 // NewKeylog initializes a new log for a key. It takes a key, location id and hash function used
 // to compute hash id's of log entries.
-func NewKeylog(entries EntryStore, idx hexatype.KeylogIndex, hasher hexatype.Hasher) *Keylog {
+func NewKeylog(entries EntryStore, idx KeylogIndex, hasher hexatype.Hasher) *Keylog {
 	return &Keylog{
 		hasher:  hasher,
 		entries: entries,
@@ -34,7 +34,7 @@ func NewKeylog(entries EntryStore, idx hexatype.KeylogIndex, hasher hexatype.Has
 
 // LastEntry returns the last entry in the Keylog.  If there are no entries in the log ,
 // nil is returned.
-func (keylog *Keylog) LastEntry() *hexatype.Entry {
+func (keylog *Keylog) LastEntry() *Entry {
 	// Get last id from index
 	lid := keylog.idx.Last()
 	if lid == nil {
@@ -47,7 +47,7 @@ func (keylog *Keylog) LastEntry() *hexatype.Entry {
 
 // AppendEntry appends an entry to the log.  It returns an error if there is a previous
 // hash mismatch
-func (keylog *Keylog) AppendEntry(entry *hexatype.Entry) (err error) {
+func (keylog *Keylog) AppendEntry(entry *Entry) (err error) {
 	id := entry.Hash(keylog.hasher.New())
 
 	if err = keylog.entries.Set(id, entry); err != nil {
@@ -67,14 +67,14 @@ func (keylog *Keylog) AppendEntry(entry *hexatype.Entry) (err error) {
 }
 
 // GetEntry gets and entry from the Keylog
-func (keylog *Keylog) GetEntry(id []byte) (*hexatype.Entry, error) {
+func (keylog *Keylog) GetEntry(id []byte) (*Entry, error) {
 	return keylog.entries.Get(id)
 }
 
 // RollbackEntry rolls the keylog back by the entry.  It only rolls back if the entry is
 // the last entry.  It returns the number of entries remaining in the log and any errors
 // occurred
-func (keylog *Keylog) RollbackEntry(entry *hexatype.Entry) (int, error) {
+func (keylog *Keylog) RollbackEntry(entry *Entry) (int, error) {
 	// Compute hash id outside of lock
 	id := entry.Hash(keylog.hasher.New())
 
@@ -100,7 +100,7 @@ func (keylog *Keylog) RollbackEntry(entry *hexatype.Entry) (int, error) {
 
 // Iter iterates over entries starting from the seek position.  It iterates over all
 // entries if seek is nil
-func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry) error) error {
+func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *Entry) error) error {
 
 	err := keylog.idx.Iter(seek, func(eid []byte) error {
 		entry, er := keylog.entries.Get(eid)
@@ -113,7 +113,7 @@ func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *hexatype.Entry
 	return err
 }
 
-// GetIndex returns a hexatype.KeylogIndex struct
-func (keylog *Keylog) GetIndex() hexatype.UnsafeKeylogIndex {
+// GetIndex returns a KeylogIndex struct
+func (keylog *Keylog) GetIndex() UnsafeKeylogIndex {
 	return keylog.idx.Index()
 }

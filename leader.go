@@ -16,7 +16,7 @@ func (hlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*KeyLeader, 
 	l := len(locs)
 
 	// Get last entry for a key from each location
-	lasts := make([]*hexatype.Entry, l)
+	lasts := make([]*Entry, l)
 	for i := 0; i < l; i++ {
 
 		loc := locs[i]
@@ -25,7 +25,7 @@ func (hlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*KeyLeader, 
 			continue
 		}
 
-		entry, err := hlog.trans.LastEntry(loc.Vnode.Host, key, &hexatype.RequestOptions{})
+		entry, err := hlog.trans.LastEntry(loc.Vnode.Host, key, &RequestOptions{})
 		if err == nil && entry != nil {
 			lasts[i] = entry
 		}
@@ -61,7 +61,7 @@ type KeyLeader struct {
 	key    []byte               // key in question
 	idx    int                  // leader index in the set for locs and lasts
 	locs   hexaring.LocationSet // participating locations
-	lasts  []*hexatype.Entry    // last entry from each participant
+	lasts  []*Entry             // last entry from each participant
 	hasher hexatype.Hasher      // hash function
 }
 
@@ -102,12 +102,12 @@ func (l *KeyLeader) Location() *hexaring.Location {
 }
 
 // LastEntry returns the last entry of the leader
-func (l *KeyLeader) LastEntry() *hexatype.Entry {
+func (l *KeyLeader) LastEntry() *Entry {
 	return l.lasts[l.idx]
 }
 
 // Entries returns the last entries for each location
-func (l *KeyLeader) Entries() []*hexatype.Entry {
+func (l *KeyLeader) Entries() []*Entry {
 	return l.lasts
 }
 
@@ -116,6 +116,6 @@ func (l KeyLeader) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Key    string
 		Leader *hexaring.Location
-		Entry  *hexatype.Entry
+		Entry  *Entry
 	}{string(l.key), l.Location(), l.LastEntry()})
 }

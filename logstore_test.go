@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 )
 
@@ -19,8 +18,8 @@ func newEntry(ls *LogStore, key string) error {
 }
 
 func TestLogStore(t *testing.T) {
-	es := store.NewInMemEntryStore()
-	is := store.NewInMemIndexStore()
+	es := NewInMemEntryStore()
+	is := NewInMemIndexStore()
 	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
 
 	kl, err := ls.NewKey([]byte("key"))
@@ -48,7 +47,7 @@ func TestLogStore(t *testing.T) {
 		t.Fatal("should have 3 entries for key index")
 	}
 
-	est := kl.entries.(*store.InMemEntryStore)
+	est := kl.entries.(*InMemEntryStore)
 	if est.Count() != 3 {
 		t.Fatal("should have 3 entries")
 	}

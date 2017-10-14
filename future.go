@@ -4,8 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"time"
-
-	"github.com/hexablock/hexatype"
 )
 
 // FutureEntry is an entry that been committed to the stable store but has not yet been
@@ -14,7 +12,7 @@ type FutureEntry struct {
 	// This is the hash id of the entry that is supplied upon instantiation
 	id []byte
 	// Entry to be applied
-	Entry *hexatype.Entry
+	Entry *Entry
 	// Channel used to signal applying entry failed
 	err chan error
 	// Channel used to signal entry was applied.  It contains the data from that returned
@@ -29,7 +27,7 @@ type FutureEntry struct {
 // NewFutureEntry instantiates a new FutureEntry with an Entry.  It is an entry that is yet
 // to be applied to the log. It can be used to wait for the entry to be applied.  It takes
 // the hash id of the entry and entry as parameters.
-func NewFutureEntry(id []byte, entry *hexatype.Entry) *FutureEntry {
+func NewFutureEntry(id []byte, entry *Entry) *FutureEntry {
 	return &FutureEntry{
 		id:    id,
 		Entry: entry,

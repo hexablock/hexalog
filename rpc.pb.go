@@ -8,13 +8,17 @@ It is generated from these files:
 	rpc.proto
 
 It has these top-level messages:
+	Entry
+	UnsafeKeylogIndex
+	ReqResp
+	RequestOptions
 */
 package hexalog
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import hexatype "github.com/hexablock/hexatype"
+import hexaring "github.com/hexablock/hexaring"
 
 import (
 	context "golang.org/x/net/context"
@@ -32,6 +36,218 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+// Hexalog entry
+type Entry struct {
+	Previous  []byte `protobuf:"bytes,1,opt,name=Previous,proto3" json:"Previous,omitempty"`
+	Timestamp uint64 `protobuf:"varint,2,opt,name=Timestamp" json:"Timestamp,omitempty"`
+	Height    uint32 `protobuf:"varint,3,opt,name=Height" json:"Height,omitempty"`
+	Key       []byte `protobuf:"bytes,4,opt,name=Key,proto3" json:"Key,omitempty"`
+	Data      []byte `protobuf:"bytes,5,opt,name=Data,proto3" json:"Data,omitempty"`
+}
+
+func (m *Entry) Reset()                    { *m = Entry{} }
+func (m *Entry) String() string            { return proto.CompactTextString(m) }
+func (*Entry) ProtoMessage()               {}
+func (*Entry) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *Entry) GetPrevious() []byte {
+	if m != nil {
+		return m.Previous
+	}
+	return nil
+}
+
+func (m *Entry) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *Entry) GetHeight() uint32 {
+	if m != nil {
+		return m.Height
+	}
+	return 0
+}
+
+func (m *Entry) GetKey() []byte {
+	if m != nil {
+		return m.Key
+	}
+	return nil
+}
+
+func (m *Entry) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
+type UnsafeKeylogIndex struct {
+	Key     []byte   `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
+	Height  uint32   `protobuf:"varint,2,opt,name=Height" json:"Height,omitempty"`
+	Marker  []byte   `protobuf:"bytes,3,opt,name=Marker,proto3" json:"Marker,omitempty"`
+	Entries [][]byte `protobuf:"bytes,4,rep,name=Entries,proto3" json:"Entries,omitempty"`
+}
+
+func (m *UnsafeKeylogIndex) Reset()                    { *m = UnsafeKeylogIndex{} }
+func (m *UnsafeKeylogIndex) String() string            { return proto.CompactTextString(m) }
+func (*UnsafeKeylogIndex) ProtoMessage()               {}
+func (*UnsafeKeylogIndex) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *UnsafeKeylogIndex) GetKey() []byte {
+	if m != nil {
+		return m.Key
+	}
+	return nil
+}
+
+func (m *UnsafeKeylogIndex) GetHeight() uint32 {
+	if m != nil {
+		return m.Height
+	}
+	return 0
+}
+
+func (m *UnsafeKeylogIndex) GetMarker() []byte {
+	if m != nil {
+		return m.Marker
+	}
+	return nil
+}
+
+func (m *UnsafeKeylogIndex) GetEntries() [][]byte {
+	if m != nil {
+		return m.Entries
+	}
+	return nil
+}
+
+// Request and response shared structure for hexalog
+type ReqResp struct {
+	// ID is based on the request/response
+	ID      []byte          `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Entry   *Entry          `protobuf:"bytes,2,opt,name=Entry" json:"Entry,omitempty"`
+	Options *RequestOptions `protobuf:"bytes,3,opt,name=Options" json:"Options,omitempty"`
+}
+
+func (m *ReqResp) Reset()                    { *m = ReqResp{} }
+func (m *ReqResp) String() string            { return proto.CompactTextString(m) }
+func (*ReqResp) ProtoMessage()               {}
+func (*ReqResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *ReqResp) GetID() []byte {
+	if m != nil {
+		return m.ID
+	}
+	return nil
+}
+
+func (m *ReqResp) GetEntry() *Entry {
+	if m != nil {
+		return m.Entry
+	}
+	return nil
+}
+
+func (m *ReqResp) GetOptions() *RequestOptions {
+	if m != nil {
+		return m.Options
+	}
+	return nil
+}
+
+// Hexalog request options
+type RequestOptions struct {
+	// Index of the source in the PeerSet.  This is set internally by the log
+	SourceIndex int32 `protobuf:"varint,1,opt,name=SourceIndex" json:"SourceIndex,omitempty"`
+	// Set of peers for the request.
+	PeerSet []*hexaring.Location `protobuf:"bytes,2,rep,name=PeerSet" json:"PeerSet,omitempty"`
+	// Number of times to retry for a given request
+	Retries int32 `protobuf:"varint,3,opt,name=Retries" json:"Retries,omitempty"`
+	// Retry interval for entry proposals
+	RetryInterval int32 `protobuf:"varint,4,opt,name=RetryInterval" json:"RetryInterval,omitempty"`
+	// Wait on ballot before returning
+	WaitBallot bool `protobuf:"varint,5,opt,name=WaitBallot" json:"WaitBallot,omitempty"`
+	// Wait for fsm to apply entry after ballot is closed. This should take
+	// effect only if WaitBallot is also true
+	WaitApply bool `protobuf:"varint,6,opt,name=WaitApply" json:"WaitApply,omitempty"`
+	// Apply timeout in ms.  This only takes effect if WaitApply is also set
+	WaitApplyTimeout int32 `protobuf:"varint,7,opt,name=WaitApplyTimeout" json:"WaitApplyTimeout,omitempty"`
+	// Lamport time
+	LTime uint64 `protobuf:"varint,8,opt,name=LTime" json:"LTime,omitempty"`
+}
+
+func (m *RequestOptions) Reset()                    { *m = RequestOptions{} }
+func (m *RequestOptions) String() string            { return proto.CompactTextString(m) }
+func (*RequestOptions) ProtoMessage()               {}
+func (*RequestOptions) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *RequestOptions) GetSourceIndex() int32 {
+	if m != nil {
+		return m.SourceIndex
+	}
+	return 0
+}
+
+func (m *RequestOptions) GetPeerSet() []*hexaring.Location {
+	if m != nil {
+		return m.PeerSet
+	}
+	return nil
+}
+
+func (m *RequestOptions) GetRetries() int32 {
+	if m != nil {
+		return m.Retries
+	}
+	return 0
+}
+
+func (m *RequestOptions) GetRetryInterval() int32 {
+	if m != nil {
+		return m.RetryInterval
+	}
+	return 0
+}
+
+func (m *RequestOptions) GetWaitBallot() bool {
+	if m != nil {
+		return m.WaitBallot
+	}
+	return false
+}
+
+func (m *RequestOptions) GetWaitApply() bool {
+	if m != nil {
+		return m.WaitApply
+	}
+	return false
+}
+
+func (m *RequestOptions) GetWaitApplyTimeout() int32 {
+	if m != nil {
+		return m.WaitApplyTimeout
+	}
+	return 0
+}
+
+func (m *RequestOptions) GetLTime() uint64 {
+	if m != nil {
+		return m.LTime
+	}
+	return 0
+}
+
+func init() {
+	proto.RegisterType((*Entry)(nil), "hexalog.Entry")
+	proto.RegisterType((*UnsafeKeylogIndex)(nil), "hexalog.UnsafeKeylogIndex")
+	proto.RegisterType((*ReqResp)(nil), "hexalog.ReqResp")
+	proto.RegisterType((*RequestOptions)(nil), "hexalog.RequestOptions")
+}
+
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
 var _ grpc.ClientConn
@@ -43,11 +259,11 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for HexalogRPC service
 
 type HexalogRPCClient interface {
-	ProposeRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error)
-	CommitRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error)
-	NewRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error)
-	GetRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error)
-	LastRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error)
+	ProposeRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error)
+	CommitRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error)
+	NewRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error)
+	GetRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error)
+	LastRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error)
 	TransferKeylogRPC(ctx context.Context, opts ...grpc.CallOption) (HexalogRPC_TransferKeylogRPCClient, error)
 	FetchKeylogRPC(ctx context.Context, opts ...grpc.CallOption) (HexalogRPC_FetchKeylogRPCClient, error)
 }
@@ -60,8 +276,8 @@ func NewHexalogRPCClient(cc *grpc.ClientConn) HexalogRPCClient {
 	return &hexalogRPCClient{cc}
 }
 
-func (c *hexalogRPCClient) ProposeRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error) {
-	out := new(hexatype.ReqResp)
+func (c *hexalogRPCClient) ProposeRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error) {
+	out := new(ReqResp)
 	err := grpc.Invoke(ctx, "/hexalog.HexalogRPC/ProposeRPC", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -69,8 +285,8 @@ func (c *hexalogRPCClient) ProposeRPC(ctx context.Context, in *hexatype.ReqResp,
 	return out, nil
 }
 
-func (c *hexalogRPCClient) CommitRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error) {
-	out := new(hexatype.ReqResp)
+func (c *hexalogRPCClient) CommitRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error) {
+	out := new(ReqResp)
 	err := grpc.Invoke(ctx, "/hexalog.HexalogRPC/CommitRPC", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -78,8 +294,8 @@ func (c *hexalogRPCClient) CommitRPC(ctx context.Context, in *hexatype.ReqResp, 
 	return out, nil
 }
 
-func (c *hexalogRPCClient) NewRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error) {
-	out := new(hexatype.ReqResp)
+func (c *hexalogRPCClient) NewRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error) {
+	out := new(ReqResp)
 	err := grpc.Invoke(ctx, "/hexalog.HexalogRPC/NewRPC", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -87,8 +303,8 @@ func (c *hexalogRPCClient) NewRPC(ctx context.Context, in *hexatype.ReqResp, opt
 	return out, nil
 }
 
-func (c *hexalogRPCClient) GetRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error) {
-	out := new(hexatype.ReqResp)
+func (c *hexalogRPCClient) GetRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error) {
+	out := new(ReqResp)
 	err := grpc.Invoke(ctx, "/hexalog.HexalogRPC/GetRPC", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -96,8 +312,8 @@ func (c *hexalogRPCClient) GetRPC(ctx context.Context, in *hexatype.ReqResp, opt
 	return out, nil
 }
 
-func (c *hexalogRPCClient) LastRPC(ctx context.Context, in *hexatype.ReqResp, opts ...grpc.CallOption) (*hexatype.ReqResp, error) {
-	out := new(hexatype.ReqResp)
+func (c *hexalogRPCClient) LastRPC(ctx context.Context, in *ReqResp, opts ...grpc.CallOption) (*ReqResp, error) {
+	out := new(ReqResp)
 	err := grpc.Invoke(ctx, "/hexalog.HexalogRPC/LastRPC", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -115,8 +331,8 @@ func (c *hexalogRPCClient) TransferKeylogRPC(ctx context.Context, opts ...grpc.C
 }
 
 type HexalogRPC_TransferKeylogRPCClient interface {
-	Send(*hexatype.ReqResp) error
-	Recv() (*hexatype.ReqResp, error)
+	Send(*ReqResp) error
+	Recv() (*ReqResp, error)
 	grpc.ClientStream
 }
 
@@ -124,12 +340,12 @@ type hexalogRPCTransferKeylogRPCClient struct {
 	grpc.ClientStream
 }
 
-func (x *hexalogRPCTransferKeylogRPCClient) Send(m *hexatype.ReqResp) error {
+func (x *hexalogRPCTransferKeylogRPCClient) Send(m *ReqResp) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *hexalogRPCTransferKeylogRPCClient) Recv() (*hexatype.ReqResp, error) {
-	m := new(hexatype.ReqResp)
+func (x *hexalogRPCTransferKeylogRPCClient) Recv() (*ReqResp, error) {
+	m := new(ReqResp)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -146,8 +362,8 @@ func (c *hexalogRPCClient) FetchKeylogRPC(ctx context.Context, opts ...grpc.Call
 }
 
 type HexalogRPC_FetchKeylogRPCClient interface {
-	Send(*hexatype.ReqResp) error
-	Recv() (*hexatype.ReqResp, error)
+	Send(*ReqResp) error
+	Recv() (*ReqResp, error)
 	grpc.ClientStream
 }
 
@@ -155,12 +371,12 @@ type hexalogRPCFetchKeylogRPCClient struct {
 	grpc.ClientStream
 }
 
-func (x *hexalogRPCFetchKeylogRPCClient) Send(m *hexatype.ReqResp) error {
+func (x *hexalogRPCFetchKeylogRPCClient) Send(m *ReqResp) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *hexalogRPCFetchKeylogRPCClient) Recv() (*hexatype.ReqResp, error) {
-	m := new(hexatype.ReqResp)
+func (x *hexalogRPCFetchKeylogRPCClient) Recv() (*ReqResp, error) {
+	m := new(ReqResp)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -170,11 +386,11 @@ func (x *hexalogRPCFetchKeylogRPCClient) Recv() (*hexatype.ReqResp, error) {
 // Server API for HexalogRPC service
 
 type HexalogRPCServer interface {
-	ProposeRPC(context.Context, *hexatype.ReqResp) (*hexatype.ReqResp, error)
-	CommitRPC(context.Context, *hexatype.ReqResp) (*hexatype.ReqResp, error)
-	NewRPC(context.Context, *hexatype.ReqResp) (*hexatype.ReqResp, error)
-	GetRPC(context.Context, *hexatype.ReqResp) (*hexatype.ReqResp, error)
-	LastRPC(context.Context, *hexatype.ReqResp) (*hexatype.ReqResp, error)
+	ProposeRPC(context.Context, *ReqResp) (*ReqResp, error)
+	CommitRPC(context.Context, *ReqResp) (*ReqResp, error)
+	NewRPC(context.Context, *ReqResp) (*ReqResp, error)
+	GetRPC(context.Context, *ReqResp) (*ReqResp, error)
+	LastRPC(context.Context, *ReqResp) (*ReqResp, error)
 	TransferKeylogRPC(HexalogRPC_TransferKeylogRPCServer) error
 	FetchKeylogRPC(HexalogRPC_FetchKeylogRPCServer) error
 }
@@ -184,7 +400,7 @@ func RegisterHexalogRPCServer(s *grpc.Server, srv HexalogRPCServer) {
 }
 
 func _HexalogRPC_ProposeRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(hexatype.ReqResp)
+	in := new(ReqResp)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -196,13 +412,13 @@ func _HexalogRPC_ProposeRPC_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: "/hexalog.HexalogRPC/ProposeRPC",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HexalogRPCServer).ProposeRPC(ctx, req.(*hexatype.ReqResp))
+		return srv.(HexalogRPCServer).ProposeRPC(ctx, req.(*ReqResp))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _HexalogRPC_CommitRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(hexatype.ReqResp)
+	in := new(ReqResp)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -214,13 +430,13 @@ func _HexalogRPC_CommitRPC_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: "/hexalog.HexalogRPC/CommitRPC",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HexalogRPCServer).CommitRPC(ctx, req.(*hexatype.ReqResp))
+		return srv.(HexalogRPCServer).CommitRPC(ctx, req.(*ReqResp))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _HexalogRPC_NewRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(hexatype.ReqResp)
+	in := new(ReqResp)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -232,13 +448,13 @@ func _HexalogRPC_NewRPC_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/hexalog.HexalogRPC/NewRPC",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HexalogRPCServer).NewRPC(ctx, req.(*hexatype.ReqResp))
+		return srv.(HexalogRPCServer).NewRPC(ctx, req.(*ReqResp))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _HexalogRPC_GetRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(hexatype.ReqResp)
+	in := new(ReqResp)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -250,13 +466,13 @@ func _HexalogRPC_GetRPC_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/hexalog.HexalogRPC/GetRPC",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HexalogRPCServer).GetRPC(ctx, req.(*hexatype.ReqResp))
+		return srv.(HexalogRPCServer).GetRPC(ctx, req.(*ReqResp))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _HexalogRPC_LastRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(hexatype.ReqResp)
+	in := new(ReqResp)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -268,7 +484,7 @@ func _HexalogRPC_LastRPC_Handler(srv interface{}, ctx context.Context, dec func(
 		FullMethod: "/hexalog.HexalogRPC/LastRPC",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HexalogRPCServer).LastRPC(ctx, req.(*hexatype.ReqResp))
+		return srv.(HexalogRPCServer).LastRPC(ctx, req.(*ReqResp))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -278,8 +494,8 @@ func _HexalogRPC_TransferKeylogRPC_Handler(srv interface{}, stream grpc.ServerSt
 }
 
 type HexalogRPC_TransferKeylogRPCServer interface {
-	Send(*hexatype.ReqResp) error
-	Recv() (*hexatype.ReqResp, error)
+	Send(*ReqResp) error
+	Recv() (*ReqResp, error)
 	grpc.ServerStream
 }
 
@@ -287,12 +503,12 @@ type hexalogRPCTransferKeylogRPCServer struct {
 	grpc.ServerStream
 }
 
-func (x *hexalogRPCTransferKeylogRPCServer) Send(m *hexatype.ReqResp) error {
+func (x *hexalogRPCTransferKeylogRPCServer) Send(m *ReqResp) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *hexalogRPCTransferKeylogRPCServer) Recv() (*hexatype.ReqResp, error) {
-	m := new(hexatype.ReqResp)
+func (x *hexalogRPCTransferKeylogRPCServer) Recv() (*ReqResp, error) {
+	m := new(ReqResp)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -304,8 +520,8 @@ func _HexalogRPC_FetchKeylogRPC_Handler(srv interface{}, stream grpc.ServerStrea
 }
 
 type HexalogRPC_FetchKeylogRPCServer interface {
-	Send(*hexatype.ReqResp) error
-	Recv() (*hexatype.ReqResp, error)
+	Send(*ReqResp) error
+	Recv() (*ReqResp, error)
 	grpc.ServerStream
 }
 
@@ -313,12 +529,12 @@ type hexalogRPCFetchKeylogRPCServer struct {
 	grpc.ServerStream
 }
 
-func (x *hexalogRPCFetchKeylogRPCServer) Send(m *hexatype.ReqResp) error {
+func (x *hexalogRPCFetchKeylogRPCServer) Send(m *ReqResp) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *hexalogRPCFetchKeylogRPCServer) Recv() (*hexatype.ReqResp, error) {
-	m := new(hexatype.ReqResp)
+func (x *hexalogRPCFetchKeylogRPCServer) Recv() (*ReqResp, error) {
+	m := new(ReqResp)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -370,17 +586,38 @@ var _HexalogRPC_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 189 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2c, 0x2a, 0x48, 0xd6,
-	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0xcf, 0x48, 0xad, 0x48, 0xcc, 0xc9, 0x4f, 0x97, 0xd2,
-	0x4c, 0xcf, 0x2c, 0xc9, 0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x07, 0x89, 0x25, 0xe5, 0xe4,
-	0x27, 0x67, 0x83, 0x59, 0x25, 0x95, 0x05, 0xa9, 0xfa, 0x20, 0xa2, 0x18, 0xa2, 0xc7, 0xa8, 0x97,
-	0x99, 0x8b, 0xcb, 0x03, 0xa2, 0x2d, 0x28, 0xc0, 0x59, 0xc8, 0x84, 0x8b, 0x2b, 0xa0, 0x28, 0xbf,
-	0x20, 0xbf, 0x38, 0x15, 0xc4, 0x13, 0xd4, 0x83, 0xe9, 0xd1, 0x0b, 0x4a, 0x2d, 0x0c, 0x4a, 0x2d,
-	0x2e, 0x90, 0xc2, 0x14, 0x52, 0x62, 0x10, 0x32, 0xe6, 0xe2, 0x74, 0xce, 0xcf, 0xcd, 0xcd, 0x2c,
-	0x21, 0x45, 0x93, 0x01, 0x17, 0x9b, 0x5f, 0x6a, 0x39, 0x89, 0x3a, 0xdc, 0x53, 0x49, 0xb2, 0xc3,
-	0x90, 0x8b, 0xdd, 0x27, 0xb1, 0x98, 0x24, 0x2d, 0xf6, 0x5c, 0x82, 0x21, 0x45, 0x89, 0x79, 0xc5,
-	0x69, 0xa9, 0x45, 0xde, 0xa9, 0x95, 0xd0, 0x60, 0x21, 0x52, 0xb3, 0x06, 0xa3, 0x01, 0xa3, 0x90,
-	0x0d, 0x17, 0x9f, 0x5b, 0x6a, 0x49, 0x72, 0x06, 0x59, 0xba, 0x93, 0xd8, 0xc0, 0xd1, 0x62, 0x0c,
-	0x08, 0x00, 0x00, 0xff, 0xff, 0xba, 0x90, 0x0f, 0xff, 0xd7, 0x01, 0x00, 0x00,
+	// 518 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0xc5, 0xce, 0x87, 0x93, 0x49, 0x1a, 0xa5, 0x2b, 0x54, 0x56, 0x11, 0x42, 0x51, 0xd4, 0x83,
+	0x05, 0xc8, 0xa1, 0xe1, 0x86, 0xc4, 0x01, 0x1a, 0xa0, 0x51, 0x03, 0x44, 0xdb, 0x22, 0xce, 0x1b,
+	0x33, 0x4d, 0xac, 0x3a, 0x5e, 0x77, 0x77, 0x5d, 0x9a, 0x13, 0x7f, 0x85, 0x7f, 0x0a, 0xda, 0x8d,
+	0x9d, 0x0f, 0xf5, 0xd2, 0xf4, 0x36, 0xef, 0xed, 0xbc, 0x79, 0x99, 0x8f, 0x18, 0xea, 0x32, 0x0d,
+	0x83, 0x54, 0x0a, 0x2d, 0x88, 0x37, 0xc7, 0x3b, 0x1e, 0x8b, 0x59, 0xe7, 0xd5, 0x2c, 0xd2, 0xf3,
+	0x6c, 0x1a, 0x84, 0x62, 0xd1, 0x37, 0xdc, 0x34, 0x16, 0xe1, 0xb5, 0x8d, 0x64, 0x94, 0xcc, 0xfa,
+	0x4a, 0xcb, 0x2c, 0xd4, 0x6a, 0xa5, 0xea, 0xfd, 0x81, 0xca, 0xa7, 0x44, 0xcb, 0x25, 0xe9, 0x40,
+	0x6d, 0x22, 0xf1, 0x36, 0x12, 0x99, 0xa2, 0x4e, 0xd7, 0xf1, 0x9b, 0x6c, 0x8d, 0xc9, 0x73, 0xa8,
+	0x5f, 0x46, 0x0b, 0x54, 0x9a, 0x2f, 0x52, 0xea, 0x76, 0x1d, 0xbf, 0xcc, 0x36, 0x04, 0x39, 0x82,
+	0xea, 0x19, 0x46, 0xb3, 0xb9, 0xa6, 0xa5, 0xae, 0xe3, 0x1f, 0xb0, 0x1c, 0x91, 0x36, 0x94, 0xce,
+	0x71, 0x49, 0xcb, 0xb6, 0x98, 0x09, 0x09, 0x81, 0xf2, 0x90, 0x6b, 0x4e, 0x2b, 0x96, 0xb2, 0x71,
+	0x4f, 0xc0, 0xe1, 0x8f, 0x44, 0xf1, 0x2b, 0x3c, 0xc7, 0x65, 0x2c, 0x66, 0xa3, 0xe4, 0x17, 0xde,
+	0x15, 0x52, 0x67, 0x23, 0xdd, 0x98, 0xb8, 0x3b, 0x26, 0x47, 0x50, 0xfd, 0xca, 0xe5, 0x35, 0x4a,
+	0x6b, 0xde, 0x64, 0x39, 0x22, 0x14, 0x3c, 0xd3, 0x57, 0x84, 0x8a, 0x96, 0xbb, 0x25, 0xbf, 0xc9,
+	0x0a, 0xd8, 0x93, 0xe0, 0x31, 0xbc, 0x61, 0xa8, 0x52, 0xd2, 0x02, 0x77, 0x34, 0xcc, 0x5d, 0xdc,
+	0xd1, 0x90, 0x1c, 0xe7, 0xc3, 0xb0, 0x1e, 0x8d, 0x41, 0x2b, 0xc8, 0x47, 0x1a, 0x58, 0x96, 0xe5,
+	0x93, 0x3a, 0x01, 0xef, 0x7b, 0xaa, 0x23, 0x91, 0x28, 0xeb, 0xd9, 0x18, 0x3c, 0x5b, 0xe7, 0x31,
+	0xbc, 0xc9, 0x50, 0xe9, 0xfc, 0x99, 0x15, 0x79, 0xbd, 0xbf, 0x2e, 0xb4, 0x76, 0xdf, 0x48, 0x17,
+	0x1a, 0x17, 0x22, 0x93, 0x21, 0xda, 0x8e, 0xed, 0x8f, 0xa8, 0xb0, 0x6d, 0x8a, 0xbc, 0x06, 0x6f,
+	0x82, 0x28, 0x2f, 0xd0, 0xf4, 0x5c, 0xf2, 0x1b, 0x03, 0x12, 0x14, 0x4b, 0x0c, 0xc6, 0x22, 0xe4,
+	0xa6, 0x0e, 0x2b, 0x52, 0x4c, 0xc3, 0x0c, 0x57, 0x0d, 0x97, 0x6c, 0xad, 0x02, 0x92, 0x63, 0x38,
+	0x30, 0xe1, 0x72, 0x94, 0x68, 0x94, 0xb7, 0x3c, 0xb6, 0x1b, 0xa9, 0xb0, 0x5d, 0x92, 0xbc, 0x00,
+	0xf8, 0xc9, 0x23, 0xfd, 0x91, 0xc7, 0xb1, 0xd0, 0x76, 0x43, 0x35, 0xb6, 0xc5, 0x98, 0x1b, 0x30,
+	0xe8, 0x43, 0x9a, 0xc6, 0x4b, 0x5a, 0xb5, 0xcf, 0x1b, 0x82, 0xbc, 0x84, 0xf6, 0x1a, 0x98, 0xcb,
+	0x10, 0x99, 0xa6, 0x9e, 0xb5, 0xb9, 0xc7, 0x93, 0xa7, 0x50, 0x19, 0x9b, 0x98, 0xd6, 0xec, 0x25,
+	0xad, 0xc0, 0xe0, 0x9f, 0x0b, 0x70, 0xb6, 0x1a, 0x23, 0x9b, 0x9c, 0x92, 0x01, 0xc0, 0x44, 0x8a,
+	0x54, 0x28, 0x34, 0xa8, 0xbd, 0x3d, 0x61, 0xb3, 0xba, 0xce, 0x3d, 0xa6, 0xf7, 0x84, 0x9c, 0x40,
+	0xfd, 0x54, 0x2c, 0x16, 0x91, 0x7e, 0xb8, 0x24, 0x80, 0xea, 0x37, 0xfc, 0xbd, 0x57, 0xfe, 0x17,
+	0xdc, 0xa3, 0x7e, 0x1f, 0xbc, 0x31, 0x57, 0x7b, 0x08, 0xde, 0xc3, 0xe1, 0xa5, 0xe4, 0x89, 0xba,
+	0x42, 0xb9, 0xfa, 0x43, 0x3c, 0x58, 0xea, 0x3b, 0x6f, 0x1c, 0xf2, 0x0e, 0x5a, 0x9f, 0x51, 0x87,
+	0xf3, 0x47, 0x68, 0xa7, 0x55, 0xfb, 0x45, 0x78, 0xfb, 0x3f, 0x00, 0x00, 0xff, 0xff, 0xdb, 0xf4,
+	0x96, 0x2b, 0x54, 0x04, 0x00, 0x00,
 }

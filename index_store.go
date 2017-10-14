@@ -1,4 +1,4 @@
-package store
+package hexalog
 
 import (
 	"sort"
@@ -10,17 +10,17 @@ import (
 // InMemIndexStore implements an in-memory KeylogIndex store interface
 type InMemIndexStore struct {
 	mu sync.RWMutex
-	m  map[string]hexatype.KeylogIndex
+	m  map[string]KeylogIndex
 }
 
 // NewInMemIndexStore initializes an in-memory store for KeylogIndexes.
 func NewInMemIndexStore() *InMemIndexStore {
-	return &InMemIndexStore{m: make(map[string]hexatype.KeylogIndex)}
+	return &InMemIndexStore{m: make(map[string]KeylogIndex)}
 }
 
 // NewKey creates a new KeylogIndex and adds it to the store.  It returns an error if it
 // already exists
-func (store *InMemIndexStore) NewKey(key []byte) (hexatype.KeylogIndex, error) {
+func (store *InMemIndexStore) NewKey(key []byte) (KeylogIndex, error) {
 	k := string(key)
 
 	store.mu.Lock()
@@ -30,7 +30,7 @@ func (store *InMemIndexStore) NewKey(key []byte) (hexatype.KeylogIndex, error) {
 		return nil, hexatype.ErrKeyExists
 	}
 
-	kli := hexatype.NewSafeKeylogIndex(key, nil)
+	kli := NewSafeKeylogIndex(key, nil)
 	store.m[k] = kli
 
 	return kli, nil
@@ -38,7 +38,7 @@ func (store *InMemIndexStore) NewKey(key []byte) (hexatype.KeylogIndex, error) {
 
 // MarkKey sets the marker on the key key.  If the key does not exist a new one is created.
 // It returns the KeylogIndex or an error.
-func (store *InMemIndexStore) MarkKey(key, marker []byte) (hexatype.KeylogIndex, error) {
+func (store *InMemIndexStore) MarkKey(key, marker []byte) (KeylogIndex, error) {
 	k := string(key)
 	store.mu.RLock()
 	if v, ok := store.m[k]; ok {
@@ -48,7 +48,7 @@ func (store *InMemIndexStore) MarkKey(key, marker []byte) (hexatype.KeylogIndex,
 	}
 	store.mu.RUnlock()
 
-	kli := hexatype.NewSafeKeylogIndex(key, marker)
+	kli := NewSafeKeylogIndex(key, marker)
 
 	store.mu.Lock()
 	store.m[k] = kli
@@ -57,7 +57,7 @@ func (store *InMemIndexStore) MarkKey(key, marker []byte) (hexatype.KeylogIndex,
 }
 
 // GetKey returns a KeylogIndex from the store or an error if not found
-func (store *InMemIndexStore) GetKey(key []byte) (hexatype.KeylogIndex, error) {
+func (store *InMemIndexStore) GetKey(key []byte) (KeylogIndex, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -84,7 +84,7 @@ func (store *InMemIndexStore) RemoveKey(key []byte) error {
 }
 
 // Iter iterates over each key and index
-func (store *InMemIndexStore) Iter(cb func([]byte, hexatype.KeylogIndex) error) error {
+func (store *InMemIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 

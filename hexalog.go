@@ -25,17 +25,17 @@ type Stats struct {
 // Transport implements a Hexalog network transport
 type Transport interface {
 	// Gets an entry from a remote host
-	GetEntry(host string, key, id []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error)
+	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
 	// Get last entry for the key
-	LastEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error)
+	LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
 	// Proposes an entry on the remote host
-	ProposeEntry(ctx context.Context, host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
+	ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error
 	// Commits an entry on the remote host
-	CommitEntry(ctx context.Context, host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error
+	CommitEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error
 	// Transfers a complete key log to the remote host
-	TransferKeylog(host string, key []byte, opts *hexatype.RequestOptions) error
+	TransferKeylog(host string, key []byte, opts *RequestOptions) error
 	// Gets all entries from the remote host for a key starting at entry
-	FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*FutureEntry, error)
+	FetchKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error)
 	// Registers the log when available
 	Register(hlog *Hexalog)
 	// Shutdown the transport closing outbound connections
@@ -59,13 +59,13 @@ type Hexalog struct {
 	mu      sync.RWMutex
 	ballots map[string]*Ballot
 	// Propose broadcast channel to broadcast proposals to the network peer set
-	pch chan *hexatype.ReqResp
+	pch chan *ReqResp
 	// Commit broadcast channel to broadcast commits to the network peer set
-	cch chan *hexatype.ReqResp
+	cch chan *ReqResp
 	// Channel for heal requests.  When previous hash mismatches occur, the log will send
 	// a request down this channel to allow applications to try to recover. This is
 	// usually the case when a keylog falls behind.
-	hch chan *hexatype.ReqResp
+	hch chan *ReqResp
 	// Gets set when once a shutdown is signalled
 	shutdown int32
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
@@ -88,9 +88,9 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		fsm:        ifsm,
 		trans:      trans,
 		ballots:    make(map[string]*Ballot),
-		pch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
-		cch:        make(chan *hexatype.ReqResp, conf.BroadcastBufSize),
-		hch:        make(chan *hexatype.ReqResp, conf.HealBufSize),
+		pch:        make(chan *ReqResp, conf.BroadcastBufSize),
+		cch:        make(chan *ReqResp, conf.BroadcastBufSize),
+		hch:        make(chan *ReqResp, conf.HealBufSize),
 		store:      logstore,
 		ltime:      &hexatype.LamportClock{},
 		shutdownCh: make(chan struct{}, 4),
@@ -132,13 +132,13 @@ func (hlog *Hexalog) start() {
 }
 
 // New returns a new Entry to be appended to the log for the given key.
-func (hlog *Hexalog) New(key []byte) *hexatype.Entry {
+func (hlog *Hexalog) New(key []byte) *Entry {
 	return hlog.store.NewEntry(key)
 }
 
 // Propose proposes an entry to the log.  It votes on a ballot if it exists or creates one
 // then votes. If required votes has been reach it also moves to the commit phase.
-func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*Ballot, error) {
+func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error) {
 	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 			// Try to heal if the new height is > then the current one
 			if entry.Height > prevHeight {
 
-				hlog.hch <- &hexatype.ReqResp{
+				hlog.hch <- &ReqResp{
 					ID:      id,    // entry hash id
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
@@ -218,7 +218,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 			}
 
 			// Broadcast proposal
-			hlog.pch <- &hexatype.ReqResp{Entry: entry, Options: opts}
+			hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 			hlog.ltime.Increment()
 		}
 
@@ -247,7 +247,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 			}
 		}
 		// Broadcast proposal
-		hlog.pch <- &hexatype.ReqResp{Entry: entry, Options: opts}
+		hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 		hlog.ltime.Increment()
 
 	} else if pvotes == hlog.conf.Votes {
@@ -277,7 +277,7 @@ func (hlog *Hexalog) Propose(entry *hexatype.Entry, opts *hexatype.RequestOption
 }
 
 // Commit tries to commit an already proposed entry to the log.
-func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*Ballot, error) {
+func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error) {
 	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err
@@ -317,7 +317,7 @@ func (hlog *Hexalog) Commit(entry *hexatype.Entry, opts *hexatype.RequestOptions
 
 // Heal submits a heal request for the given key.  It returns an error if the options are
 // invalid.
-func (hlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
+func (hlog *Hexalog) Heal(key []byte, opts *RequestOptions) error {
 	if err := hlog.checkOptions(opts); err != nil {
 		return err
 	}
@@ -326,8 +326,8 @@ func (hlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
 	// 	return err
 	// }
 
-	ent := &hexatype.Entry{Key: key}
-	hlog.hch <- &hexatype.ReqResp{Options: opts, Entry: ent}
+	ent := &Entry{Key: key}
+	hlog.hch <- &ReqResp{Options: opts, Entry: ent}
 
 	return nil
 }

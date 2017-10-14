@@ -12,7 +12,7 @@ import (
 
 // sendProposal makes a single proposal request to a location.  if a hexatype.ErrPreviousHash
 // error is returned a  heal request is submitted
-func (hlog *Hexalog) sendProposal(ctx context.Context, entry *hexatype.Entry, loc *hexaring.Location, idx int, opts *hexatype.RequestOptions) error {
+func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *hexaring.Location, idx int, opts *RequestOptions) error {
 	host := loc.Vnode.Host
 	o := opts.CloneWithSourceIndex(int32(idx))
 
@@ -21,7 +21,7 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *hexatype.Entry, lo
 
 	switch err {
 	case hexatype.ErrPreviousHash:
-		hlog.hch <- &hexatype.ReqResp{
+		hlog.hch <- &ReqResp{
 			Options: opts,
 			Entry:   entry,
 		}
@@ -34,7 +34,7 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *hexatype.Entry, lo
 }
 
 // broadcastPropose broadcasts proposal entries to all members in the peer set
-func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error {
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
@@ -51,7 +51,7 @@ func (hlog *Hexalog) broadcastPropose(entry *hexatype.Entry, opts *hexatype.Requ
 			continue
 		}
 
-		go func(ent *hexatype.Entry, loc *hexaring.Location, i int, o *hexatype.RequestOptions) {
+		go func(ent *Entry, loc *hexaring.Location, i int, o *RequestOptions) {
 			resp <- hlog.sendProposal(ctx, ent, loc, i, o)
 		}(entry, p, idx, opts)
 
@@ -89,7 +89,7 @@ func (hlog *Hexalog) broadcastProposals() {
 }
 
 // broadcastCommit broadcasts the commit entry to all members in the peer set
-func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
@@ -106,7 +106,7 @@ func (hlog *Hexalog) broadcastCommit(entry *hexatype.Entry, opts *hexatype.Reque
 			continue
 		}
 
-		go func(ent *hexatype.Entry, loc *hexaring.Location, i int, opt *hexatype.RequestOptions) {
+		go func(ent *Entry, loc *hexaring.Location, i int, opt *RequestOptions) {
 			o := opt.CloneWithSourceIndex(int32(i))
 			host := loc.Vnode.Host
 

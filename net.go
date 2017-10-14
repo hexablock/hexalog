@@ -49,13 +49,13 @@ func NewNetTransport(reapInterval, maxConnIdle time.Duration) *NetTransport {
 }
 
 // NewEntry requests a new Entry for a given key from the remote host.
-func (trans *NetTransport) NewEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error) {
+func (trans *NetTransport) NewEntry(host string, key []byte, opts *RequestOptions) (*Entry, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	req := &hexatype.ReqResp{Entry: &hexatype.Entry{Key: key}, Options: opts}
+	req := &ReqResp{Entry: &Entry{Key: key}, Options: opts}
 	resp, err := conn.client.NewRPC(context.Background(), req)
 	if err != nil {
 		trans.returnConn(conn)
@@ -66,13 +66,13 @@ func (trans *NetTransport) NewEntry(host string, key []byte, opts *hexatype.Requ
 }
 
 // ProposeEntry makes a Propose request on a remote host
-func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err
 	}
 
-	req := &hexatype.ReqResp{Entry: entry, Options: opts}
+	req := &ReqResp{Entry: entry, Options: opts}
 	_, err = conn.client.ProposeRPC(ctx, req)
 	trans.returnConn(conn)
 
@@ -84,13 +84,13 @@ func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry 
 }
 
 // CommitEntry makes a Commit request on a remote host
-func (trans *NetTransport) CommitEntry(ctx context.Context, host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) CommitEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err
 	}
 
-	req := &hexatype.ReqResp{Entry: entry, Options: opts}
+	req := &ReqResp{Entry: entry, Options: opts}
 	if _, err = conn.client.CommitRPC(ctx, req); err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
@@ -100,13 +100,13 @@ func (trans *NetTransport) CommitEntry(ctx context.Context, host string, entry *
 }
 
 // LastEntry retrieves the last entry for the given key from a remote host.
-func (trans *NetTransport) LastEntry(host string, key []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error) {
+func (trans *NetTransport) LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	req := &hexatype.ReqResp{Entry: &hexatype.Entry{Key: key}, Options: opts}
+	req := &ReqResp{Entry: &Entry{Key: key}, Options: opts}
 	resp, err := conn.client.LastRPC(context.Background(), req)
 	trans.returnConn(conn)
 
@@ -118,13 +118,13 @@ func (trans *NetTransport) LastEntry(host string, key []byte, opts *hexatype.Req
 }
 
 // GetEntry makes a Get request to retrieve an Entry from a remote host.
-func (trans *NetTransport) GetEntry(host string, key, id []byte, opts *hexatype.RequestOptions) (*hexatype.Entry, error) {
+func (trans *NetTransport) GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	req := &hexatype.ReqResp{ID: id, Entry: &hexatype.Entry{Key: key}, Options: opts}
+	req := &ReqResp{ID: id, Entry: &Entry{Key: key}, Options: opts}
 	resp, err := conn.client.GetRPC(context.Background(), req)
 	trans.returnConn(conn)
 
@@ -207,8 +207,8 @@ func (trans *NetTransport) Register(hlog *Hexalog) {
 }
 
 // ProposeRPC serves a Propose request.  The underlying ballot from the local log is ignored
-func (trans *NetTransport) ProposeRPC(ctx context.Context, req *hexatype.ReqResp) (*hexatype.ReqResp, error) {
-	resp := &hexatype.ReqResp{}
+func (trans *NetTransport) ProposeRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
+	resp := &ReqResp{}
 	ballot, err := trans.hlog.Propose(req.Entry, req.Options)
 	if err != nil {
 		return resp, err
@@ -233,16 +233,16 @@ func (trans *NetTransport) ProposeRPC(ctx context.Context, req *hexatype.ReqResp
 }
 
 // CommitRPC serves a Commit request.  The underlying ballot from the local log is ignored
-func (trans *NetTransport) CommitRPC(ctx context.Context, req *hexatype.ReqResp) (*hexatype.ReqResp, error) {
-	resp := &hexatype.ReqResp{}
+func (trans *NetTransport) CommitRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
+	resp := &ReqResp{}
 	_, err := trans.hlog.Commit(req.Entry, req.Options)
 	return resp, err
 }
 
 // GetRPC serves a Commit request.  The underlying ballot from the local log is ignored
-func (trans *NetTransport) GetRPC(ctx context.Context, req *hexatype.ReqResp) (*hexatype.ReqResp, error) {
+func (trans *NetTransport) GetRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
 	var (
-		resp = &hexatype.ReqResp{}
+		resp = &ReqResp{}
 		err  error
 	)
 
@@ -252,16 +252,16 @@ func (trans *NetTransport) GetRPC(ctx context.Context, req *hexatype.ReqResp) (*
 }
 
 // LastRPC serves a LastEntry request.  It returns the local last entry for a key.
-func (trans *NetTransport) LastRPC(ctx context.Context, req *hexatype.ReqResp) (*hexatype.ReqResp, error) {
-	var resp = &hexatype.ReqResp{
+func (trans *NetTransport) LastRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
+	var resp = &ReqResp{
 		Entry: trans.hlog.store.LastEntry(req.Entry.Key),
 	}
 	return resp, nil
 }
 
 // NewRPC serves a NewEntry request from the local log
-func (trans *NetTransport) NewRPC(ctx context.Context, req *hexatype.ReqResp) (*hexatype.ReqResp, error) {
-	return &hexatype.ReqResp{
+func (trans *NetTransport) NewRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
+	return &ReqResp{
 		Entry: trans.hlog.New(req.Entry.Key),
 	}, nil
 }
@@ -271,7 +271,7 @@ func (trans *NetTransport) NewRPC(ctx context.Context, req *hexatype.ReqResp) (*
 // each entry directly to the log and submits to the FSM and returns a FutureEntry which
 // is the last entry that was appended to the key log and/or an error.  The keylog must
 // exist in order for the log to be sucessfully fetched.
-func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*FutureEntry, error) {
+func (trans *NetTransport) FetchKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return nil, err
@@ -283,7 +283,7 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry, opts 
 
 	// Send the entry we want to start at.  Only generate an id for the entry if the
 	// previous hash is not nil.  Remote assumes all log entries if the request id is nil.
-	req := &hexatype.ReqResp{Entry: entry}
+	req := &ReqResp{Entry: entry}
 	if entry.Previous != nil {
 		req.ID = entry.Hash(trans.hlog.conf.Hasher.New())
 	}
@@ -298,7 +298,7 @@ func (trans *NetTransport) FetchKeylog(host string, entry *hexatype.Entry, opts 
 
 	// Start recieving entries
 	for {
-		var msg *hexatype.ReqResp
+		var msg *ReqResp
 		if msg, err = stream.Recv(); err != nil {
 			if err == io.EOF {
 				err = nil
@@ -353,8 +353,8 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	}
 
 	// Start sending entries starting from the id in the request
-	err = keylog.Iter(seek, func(id []byte, entry *hexatype.Entry) error {
-		resp := &hexatype.ReqResp{Entry: entry, ID: id}
+	err = keylog.Iter(seek, func(id []byte, entry *Entry) error {
+		resp := &ReqResp{Entry: entry, ID: id}
 		return stream.Send(resp)
 	})
 
@@ -362,7 +362,7 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 }
 
 // TransferKeylog transfers a key directly from the store to the given host
-func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *hexatype.RequestOptions) error {
+func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *RequestOptions) error {
 	// Get the keylog
 	keylog, err := trans.hlog.store.GetKey(key)
 	if err != nil {
@@ -387,7 +387,7 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *hexatyp
 
 	// Send request preamble with the local last entry letting the  remote know what key we
 	// are requesting
-	preamble := &hexatype.ReqResp{Entry: last}
+	preamble := &ReqResp{Entry: last}
 	if err = stream.Send(preamble); err != nil {
 		return err
 	}
@@ -403,9 +403,9 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *hexatyp
 		seek = preamble.Entry.Hash(trans.hlog.conf.Hasher.New())
 	}
 	// Iterate based on seek position
-	err = keylog.Iter(seek, func(id []byte, entry *hexatype.Entry) error {
+	err = keylog.Iter(seek, func(id []byte, entry *Entry) error {
 		// Send entry
-		req := &hexatype.ReqResp{ID: id, Entry: entry}
+		req := &ReqResp{ID: id, Entry: entry}
 		if err = stream.Send(req); err != nil {
 			return err
 		}
@@ -442,7 +442,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	}
 
 	// Send last entry we have for the key back to requester
-	preamble := &hexatype.ReqResp{
+	preamble := &ReqResp{
 		Entry: keylog.LastEntry(),
 	}
 	if err = stream.Send(preamble); err != nil {
@@ -454,7 +454,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 
 	// Start receiving entries from the remote host
 	for {
-		var msg *hexatype.ReqResp
+		var msg *ReqResp
 		if msg, err = stream.Recv(); err != nil {
 			if err == io.EOF {
 				// TODO: may need to wait for entry to be applied
