@@ -58,16 +58,6 @@ func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 		lastID = last.Hash(hlog.conf.Hasher.New())
 	}
 
-	// TODO: CHeck keylog for marker.  if present fail the verification as we are not
-	// allowed to write via voting until the marker has been cleared.
-
-	// TODO: Re-visit
-	// Check height
-	// if entry.Height != prevHeight+1 {
-	// 	err = errPreviousHash
-	// 	return
-	// }
-
 	// Check the previous hash
 	if bytes.Compare(entry.Previous, lastID) != 0 {
 		err = hexatype.ErrPreviousHash

@@ -160,29 +160,23 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	if err != nil {
 		// Check for heal if previous hash mismatch
 		if err == hexatype.ErrPreviousHash {
-			// Try to heal if the new height is > then the current one
+			// Try to heal if the new height is > then the current one.  THis prevents
+			// an infinite retry. If the height <= we do nothing
 			if entry.Height > prevHeight {
-
+				// Submit heal request
 				hlog.hch <- &ReqResp{
 					ID:      id,    // entry hash id
 					Entry:   entry, // entry itself
 					Options: opts,  // participating peers
 				}
-				//
-				// TODO: Gate to avoid an infinite retry.  Currently gated only by height check.
-				//
-
 				// Return here to allow for a retry.
 				return nil, err
-
-			} else if entry.Height == prevHeight {
-				log.Printf("[TODO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
-
-				// TODO: deep reconciliation
-
-			} else {
-				log.Printf("[DEBUG] Not healing key=%s curr-height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
 			}
+			//else if entry.Height == prevHeight {
+			//log.Printf("[INFO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
+			//} else {
+			//log.Printf("[DEBUG] Not healing key=%s curr-height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
+			//}
 
 		}
 
@@ -266,7 +260,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		} else {
 
 			// We rollback here as we appended but the vote failed
-			log.Printf("[DEBUG] Rolling back key=%s height=%d id=%x", entry.Key, entry.Height, id)
+			log.Printf("[INFO] Rolling back key=%s height=%d id=%x", entry.Key, entry.Height, id)
 			if er := hlog.store.RollbackEntry(entry); er != nil {
 				log.Printf("[ERROR] Rollback failed key=%s height=%d error='%v'", entry.Key, entry.Height, er)
 			}

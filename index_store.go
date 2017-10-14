@@ -101,7 +101,7 @@ func (store *InMemIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
 	return nil
 }
 
-// KeyCount returns the total number of keys in the index
+// Count returns the total number of keys in the index
 func (store *InMemIndexStore) Count() int64 {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
