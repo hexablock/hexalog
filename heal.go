@@ -9,12 +9,6 @@ import (
 )
 
 func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
-	// Make sure we are part of the set.  We check this first to avoid rpcs for
-	// the leader call
-	// _, err := locs.GetByHost(hlog.conf.Hostname)
-	// if err != nil {
-	// 	return err
-	// }
 
 	leader, err := hlog.Leader(key, locs)
 	if err != nil {
@@ -48,13 +42,10 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	}
 
 	var (
-		h   = hlog.conf.Hasher.New()
-		llh = lle.Hash(h)
-		slh []byte
-		//lasts = leader.Entries()
-		//last  = lasts[sloc.Priority]
+		h    = hlog.conf.Hasher.New()
+		llh  = lle.Hash(h)
+		slh  []byte
 		last = keylog.LastEntry()
-		//lastID =
 	)
 
 	if last == nil {
@@ -69,6 +60,21 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	if bytes.Compare(slh, llh) != 0 {
 		_, er := hlog.trans.FetchKeylog(lloc.Host(), last, nil)
 		return mergeErrors(err, er)
+	}
+
+	//Check consistency
+	leader, er := hlog.Leader(key, locs)
+	if er == nil {
+
+		ok, loc := leader.IsConsistent()
+		if ok {
+			log.Printf("[INFO] Key consistent key=%s", key)
+		} else {
+			log.Printf("[TODO] Key inconsistent key=%s host=%s", key, loc.Host())
+		}
+
+	} else {
+		log.Printf("[ERROR] Failed to get leader key=%s", key)
 	}
 
 	return err
