@@ -81,6 +81,11 @@ func (l *KeyLeader) IsConsistent() (bool, *hexaring.Location) {
 		if i == l.idx {
 			continue
 		}
+
+		if ent == nil {
+			return false, l.locs[i]
+		}
+
 		nid := ent.Hash(l.hasher.New())
 		if bytes.Compare(id, nid) != 0 {
 			// Return inconsistent location
