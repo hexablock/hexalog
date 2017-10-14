@@ -18,6 +18,11 @@ func NewInMemIndexStore() *InMemIndexStore {
 	return &InMemIndexStore{m: make(map[string]KeylogIndex)}
 }
 
+// Name returns the name of the index store
+func (store *InMemIndexStore) Name() string {
+	return storeNameInmem
+}
+
 // NewKey creates a new KeylogIndex and adds it to the store.  It returns an error if it
 // already exists
 func (store *InMemIndexStore) NewKey(key []byte) (KeylogIndex, error) {

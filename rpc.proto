@@ -24,6 +24,8 @@ message Entry {
     bytes Data = 5;
 }
 
+// UnsafeKeylogIndex is an in-memory keylog index. This is the base class for all
+// implementations of KeylogIndex
 message UnsafeKeylogIndex {
     bytes Key = 1;              // key for the index
     uint32 Height = 2;          // Current height of the keylog

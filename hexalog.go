@@ -83,6 +83,8 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		return nil, err
 	}
 
+	log.Printf("[INFO] Hexalog store type='stable' name='%s'", stableStore.Name())
+
 	hlog := &Hexalog{
 		conf:       conf,
 		fsm:        ifsm,

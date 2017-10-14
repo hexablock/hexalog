@@ -10,6 +10,8 @@ import (
 // IndexStore implements a datastore for the log indexes.  It contains all keys on a node
 // with their associated keylog.  The interface must be thread-safe
 type IndexStore interface {
+	// Name of the store
+	Name() string
 	// Create a new KeylogIndex and add it to the store.
 	NewKey(key []byte) (KeylogIndex, error)
 	// Get a KeylogIndex from the store
@@ -26,6 +28,7 @@ type IndexStore interface {
 
 // EntryStore implements a datastore for log entries.
 type EntryStore interface {
+	Name() string // Name of store
 	Get(id []byte) (*Entry, error)
 	Set(id []byte, entry *Entry) error
 	Delete(id []byte) error
@@ -46,11 +49,14 @@ type LogStore struct {
 
 // NewLogStore initializes a new in-memory log store
 func NewLogStore(entries EntryStore, index IndexStore, hasher hexatype.Hasher) *LogStore {
-	return &LogStore{
+	ls := &LogStore{
 		hasher:  hasher,
 		entries: entries,
 		index:   index,
 	}
+	log.Printf("[INFO] Hexalog store type='entry' name='%s'", entries.Name())
+	log.Printf("[INFO] Hexalog store type='index' name='%s'", index.Name())
+	return ls
 }
 
 // NewKey creates a new keylog for a key.  It returns an error if the key already exists

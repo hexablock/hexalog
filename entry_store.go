@@ -17,6 +17,11 @@ func NewInMemEntryStore() *InMemEntryStore {
 	return &InMemEntryStore{m: make(map[string]*Entry)}
 }
 
+// Name returns the name of the entry store
+func (store *InMemEntryStore) Name() string {
+	return storeNameInmem
+}
+
 // Get tries to get an entry by or returns an error
 func (store *InMemEntryStore) Get(id []byte) (*Entry, error) {
 	store.mu.RLock()

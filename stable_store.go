@@ -1,14 +1,9 @@
 package hexalog
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/hexablock/hexatype"
-)
-
-var (
-	errNotFound = errors.New("not found")
 )
 
 // InMemStableStore implements an in-memory StableStore interface
@@ -22,6 +17,11 @@ type InMemStableStore struct {
 func (store *InMemStableStore) Open() error {
 	store.m = make(map[string][]byte)
 	return nil
+}
+
+// Name returns the name of the stable store
+func (store *InMemStableStore) Name() string {
+	return storeNameInmem
 }
 
 // Get gets a key from the in-memory data structure

@@ -23,6 +23,7 @@ type FSM interface {
 // each key and the hash of the last applied entry.  This is used when a node is restarted
 // to ensure it is caught up.
 type StableStore interface {
+	Name() string
 	Open() error
 	Get(key []byte) ([]byte, error)
 	Set(key []byte, value []byte) error

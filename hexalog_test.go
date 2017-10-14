@@ -1,6 +1,7 @@
 package hexalog
 
 import (
+	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -66,16 +67,25 @@ type testServer struct {
 	fsm *EchoFSM
 
 	hlog *Hexalog
+
+	datadir string
 }
 
 func (server *testServer) start() {
 	go server.s.Serve(server.ln)
 }
 
+func (server *testServer) cleanup() {
+	os.RemoveAll(server.datadir)
+}
+
 func (server *testServer) stop() {
 	server.hlog.trans.Shutdown()
 	server.s.Stop()
 	server.ln.Close()
+
+	server.es.Close()
+	server.cleanup()
 }
 
 func initConf(addr string) *Config {
@@ -98,6 +108,7 @@ func initTestServer(addr string) *testServer {
 	ts.s = grpc.NewServer()
 
 	ts.conf = initConf(addr)
+	ts.datadir, _ = ioutil.TempDir("/tmp", "hexalog-")
 
 	// Set to low value to allow reaper testing
 	trans := NewNetTransport(500*time.Millisecond, 3*time.Second)
