@@ -119,3 +119,8 @@ func (store *InMemIndexStore) sortedKeys() []string {
 	sort.Strings(keys)
 	return keys
 }
+
+// Close is a noop
+func (store *InMemIndexStore) Close() error {
+	return nil
+}

@@ -24,6 +24,8 @@ type IndexStore interface {
 	Iter(cb func(key []byte, kli KeylogIndex) error) error
 	// Total number of keys in the index
 	Count() int64
+	// Close the index store
+	Close() error
 }
 
 // EntryStore implements a datastore for log entries.
