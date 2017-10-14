@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc"
 
 	chord "github.com/hexablock/go-chord"
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
 )
@@ -86,7 +85,7 @@ func initConf(addr string) *Config {
 }
 
 func (server *testServer) initStorage() {
-	server.ss = &store.InMemStableStore{}
+	server.ss = &InMemStableStore{}
 	server.es = NewInMemEntryStore()
 	server.is = NewInMemIndexStore()
 	server.ls = NewLogStore(server.es, server.is, server.conf.Hasher)

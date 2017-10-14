@@ -1,4 +1,4 @@
-package store
+package hexalog
 
 import (
 	"bytes"
