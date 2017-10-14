@@ -14,8 +14,8 @@ import (
 // Stats contains various pieces of information regarding the current
 // state of the log
 type Stats struct {
-	Keys      int
-	Entries   int
+	Keys      int64
+	Entries   int64
 	Ballots   int
 	Proposals int
 	Commits   int
@@ -336,7 +336,8 @@ func (hlog *Hexalog) Heal(key []byte, opts *RequestOptions) error {
 
 // Shutdown signals a shutdown and waits for all go-routines to exit before returning.  It
 // will take atleast the amount of time specified as the ballot reap interval as shutdown
-// for the ballot reaper is checked at the top of the loop
+// for the ballot reaper is checked at the top of the loop.  It does not shutdown the
+// stores as they may be in use by other components
 func (hlog *Hexalog) Shutdown() {
 	atomic.StoreInt32(&hlog.shutdown, 1)
 

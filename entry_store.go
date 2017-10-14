@@ -59,11 +59,11 @@ func (store *InMemEntryStore) Delete(id []byte) error {
 }
 
 // Count returns the number of entries currently in the store.
-func (store *InMemEntryStore) Count() int {
+func (store *InMemEntryStore) Count() int64 {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	return len(store.m)
+	return int64(len(store.m))
 }
 
 // Close is a no-op to satisfy the EntryStore interface

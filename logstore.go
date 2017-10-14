@@ -23,7 +23,7 @@ type IndexStore interface {
 	// Iterate over each key
 	Iter(cb func(key []byte, kli KeylogIndex) error) error
 	// Total number of keys in the index
-	KeyCount() int
+	Count() int64
 }
 
 // EntryStore implements a datastore for log entries.
@@ -32,7 +32,7 @@ type EntryStore interface {
 	Get(id []byte) (*Entry, error)
 	Set(id []byte, entry *Entry) error
 	Delete(id []byte) error
-	Count() int
+	Count() int64
 	Close() error
 }
 
@@ -176,7 +176,7 @@ func (hlog *LogStore) AppendEntry(entry *Entry) error {
 // Stats returns a Stats object with the store related stats only
 func (hlog *LogStore) Stats() *Stats {
 	return &Stats{
-		Keys:    hlog.index.KeyCount(),
+		Keys:    hlog.index.Count(),
 		Entries: hlog.entries.Count(),
 	}
 }
