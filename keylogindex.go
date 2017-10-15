@@ -33,6 +33,8 @@ type KeylogIndex interface {
 	Height() uint32
 	// Index object used as readonly
 	Index() UnsafeKeylogIndex
+	// Flush to disk and remove from mem
+	Close() error
 }
 
 // NewUnsafeKeylogIndex creates a new keylog index
@@ -264,6 +266,11 @@ func (idx *SafeKeylogIndex) Index() UnsafeKeylogIndex {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	return *idx.idx
+}
+
+// Close is a noop
+func (idx *SafeKeylogIndex) Close() error {
+	return nil
 }
 
 func isZeroBytes(b []byte) bool {

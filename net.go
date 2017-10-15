@@ -344,6 +344,7 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	if err != nil {
 		return err
 	}
+	defer keylog.Close()
 
 	// Get the seek position from the request id.  If it is nil assume all log entries need
 	// to be sent
@@ -368,6 +369,7 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *Request
 	if err != nil {
 		return err
 	}
+	defer keylog.Close()
 
 	last := keylog.LastEntry()
 	// Nothing to transfer
@@ -440,6 +442,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	if keylog, err = trans.hlog.store.GetKey(req.Entry.Key); err != nil {
 		return err
 	}
+	defer keylog.Close()
 
 	// Send last entry we have for the key back to requester
 	preamble := &ReqResp{

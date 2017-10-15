@@ -40,6 +40,7 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 			return err
 		}
 	}
+	defer keylog.Close()
 
 	var (
 		h    = hlog.conf.Hasher.New()

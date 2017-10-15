@@ -38,7 +38,7 @@ func TestLogStore(t *testing.T) {
 	}
 
 	for i := 0; i < 3; i++ {
-		if err := newEntry(ls, "key"); err != nil {
+		if err = newEntry(ls, "key"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -51,6 +51,15 @@ func TestLogStore(t *testing.T) {
 	if est.Count() != 3 {
 		t.Fatal("should have 3 entries")
 	}
+
+	if kl, err = ls.GetKey([]byte("key")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = ls.RemoveKey([]byte("key")); err != nil {
+		t.Fatal(err)
+	}
+
 }
 
 func Test_logStore_integration(t *testing.T) {

@@ -117,8 +117,12 @@ func (fsm *fsm) startApply() {
 // check checks entries in the logstore against what is committed to the stable store and
 // submits entries to be applied to the fsm where it left off
 func (fsm *fsm) check() error {
-	log.Printf("[INFO] Validating FSM against hexalog")
-	return fsm.ls.index.Iter(func(key []byte, ki KeylogIndex) error {
+	var (
+		t int
+		c int
+	)
+	err := fsm.ls.index.Iter(func(key []byte, ki KeylogIndex) error {
+		t++
 		// Last local entry for key
 		last := ki.Last()
 		seek, err := fsm.ss.Get(key)
@@ -142,7 +146,11 @@ func (fsm *fsm) check() error {
 
 			return nil
 		})
-
+		c++
 		return nil
 	})
+
+	log.Printf("[INFO] Hexalog validated checked=%d updated=%d", t, c)
+
+	return err
 }

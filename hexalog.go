@@ -172,11 +172,6 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 				// Return here to allow for a retry.
 				return nil, err
 			}
-			//else if entry.Height == prevHeight {
-			//log.Printf("[INFO] Heal same height entry key=%s height=%d id=%x", entry.Key, entry.Height, id)
-			//} else {
-			//log.Printf("[DEBUG] Not healing key=%s curr-height=%d proposed-height=%d", entry.Key, prevHeight, entry.Height)
-			//}
 
 		}
 
@@ -203,13 +198,11 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 				return nil, err
 			}
 
-			// Create a new key if height is zero and we don't have it.
+			// Create a new key if height is zero. We ignore the error as it may already
+			// have been created
 			if prevHeight == 0 {
-				if _, er := hlog.store.GetKey(entry.Key); er != nil {
-					if _, err = hlog.store.NewKey(entry.Key); err != nil {
-						ballot.close(err)
-						return ballot, err
-					}
+				if kli, er := hlog.store.NewKey(entry.Key); er == nil {
+					kli.Close()
 				}
 			}
 
@@ -233,13 +226,11 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	}
 
 	if pvotes == 1 {
-		// Create a new key if height is 0 and we don't have the key
+		// Create a new key if height is 0 and we don't have the key.  We ignore the
+		// error as it may already have been created.
 		if prevHeight == 0 {
-			if _, er := hlog.store.GetKey(entry.Key); er != nil {
-				if _, err = hlog.store.NewKey(entry.Key); err != nil {
-					ballot.close(err)
-					return ballot, err
-				}
+			if kli, er := hlog.store.NewKey(entry.Key); er == nil {
+				kli.Close()
 			}
 		}
 		// Broadcast proposal
@@ -252,7 +243,6 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		var cvotes int
 		cvotes, err = ballot.voteCommit(id, string(opts.PeerSet[idx].Vnode.Id))
 		if err == nil {
-
 			// Take action if we have the required commits by appending the log entry and calling
 			// app fsm.Apply
 			hlog.checkCommitAndAct(cvotes, ballot, id, entry, opts)

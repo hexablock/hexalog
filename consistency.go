@@ -45,12 +45,15 @@ func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 		}
 		err = nil
 		// Continue if key not found as it may be the first entry for the key
-	} else if kl.Marker() != nil {
-		return 0, fmt.Errorf("key degraded")
+	} else {
+		defer kl.Close()
+		if kl.Marker() != nil {
+			return 0, fmt.Errorf("key degraded")
+		}
 	}
 
 	// Set the default last id to a zero hash
-	lastID := make([]byte, hlog.conf.Hasher.New().Size())
+	lastID := make([]byte, hlog.conf.Hasher.Size())
 	// Try to get the last entry
 	last := hlog.store.LastEntry(entry.Key)
 	if last != nil {

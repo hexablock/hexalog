@@ -45,6 +45,7 @@ func (store *InMemIndexStore) NewKey(key []byte) (KeylogIndex, error) {
 // It returns the KeylogIndex or an error.
 func (store *InMemIndexStore) MarkKey(key, marker []byte) (KeylogIndex, error) {
 	k := string(key)
+
 	store.mu.RLock()
 	if v, ok := store.m[k]; ok {
 		store.mu.RUnlock()
@@ -83,6 +84,7 @@ func (store *InMemIndexStore) RemoveKey(key []byte) error {
 
 	if _, ok := store.m[k]; ok {
 		delete(store.m, k)
+		return nil
 	}
 
 	return hexatype.ErrKeyNotFound
@@ -93,8 +95,10 @@ func (store *InMemIndexStore) Iter(cb func([]byte, KeylogIndex) error) error {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	for k, v := range store.m {
-		if err := cb([]byte(k), v); err != nil {
+	keys := store.sortedKeys()
+
+	for _, k := range keys {
+		if err := cb([]byte(k), store.m[k]); err != nil {
 			return err
 		}
 	}

@@ -70,6 +70,36 @@ func (hlog *LogStore) NewKey(key []byte) (keylog *Keylog, err error) {
 	return NewKeylog(hlog.entries, idx, hlog.hasher), nil
 }
 
+// GetKey returns the log for the given key
+func (hlog *LogStore) GetKey(key []byte) (keylog *Keylog, err error) {
+	idx, err := hlog.index.GetKey(key)
+	if err == nil {
+		return NewKeylog(hlog.entries, idx, hlog.hasher), nil
+	}
+
+	return nil, err
+}
+
+// RemoveKey marks a key log to be removed.  It is actually removed during compaction
+func (hlog *LogStore) RemoveKey(key []byte) error {
+	keylog, err := hlog.GetKey(key)
+	if err != nil {
+		return err
+	}
+	defer keylog.Close()
+
+	if err = hlog.index.RemoveKey(key); err == nil {
+		err = keylog.Iter(nil, func(id []byte, entry *Entry) error {
+			//
+			// TODO: Schedule removal of all log entries for the key
+			//
+			return nil
+		})
+	}
+
+	return err
+}
+
 // GetEntry gets an entry by key and id of the entry
 func (hlog *LogStore) GetEntry(key, id []byte) (*Entry, error) {
 	return hlog.entries.Get(id)
@@ -81,6 +111,7 @@ func (hlog *LogStore) LastEntry(key []byte) *Entry {
 	if err != nil {
 		return nil
 	}
+	defer idx.Close()
 
 	lh := idx.Last()
 	if lh == nil {
@@ -102,10 +133,11 @@ func (hlog *LogStore) NewEntry(key []byte) *Entry {
 	if err == nil {
 		prev = idx.Last()
 		height = uint32(idx.Count() + 1)
+		defer idx.Close()
 	}
 	// First entry
 	if prev == nil {
-		prev = make([]byte, hlog.hasher.New().Size())
+		prev = make([]byte, hlog.hasher.Size())
 		height = 1
 	}
 
@@ -124,6 +156,7 @@ func (hlog *LogStore) RollbackEntry(entry *Entry) error {
 	if err != nil {
 		return err
 	}
+	defer keylog.Close()
 
 	c, err := keylog.RollbackEntry(entry)
 	// If we have no entries in the log after the rollback, remove the Keylog completely
@@ -137,39 +170,11 @@ func (hlog *LogStore) RollbackEntry(entry *Entry) error {
 	return err
 }
 
-// GetKey returns the log for the given key
-func (hlog *LogStore) GetKey(key []byte) (keylog *Keylog, err error) {
-	idx, err := hlog.index.GetKey(key)
-	if err == nil {
-		return NewKeylog(hlog.entries, idx, hlog.hasher), nil
-	}
-
-	return nil, err
-}
-
-// RemoveKey marks a key log to be removed.  It is actually removed during compaction
-func (hlog *LogStore) RemoveKey(key []byte) error {
-	keylog, err := hlog.GetKey(key)
-	if err != nil {
-		return err
-	}
-
-	if err = hlog.index.RemoveKey(key); err == nil {
-		err = keylog.Iter(nil, func(id []byte, entry *Entry) error {
-			//
-			// TODO: Schedule removal of all log entries for the key
-			//
-			return nil
-		})
-	}
-
-	return err
-}
-
 // AppendEntry appends an entry to a KeyLog.  If the key does not exist it returns an error
 func (hlog *LogStore) AppendEntry(entry *Entry) error {
 	keylog, err := hlog.GetKey(entry.Key)
 	if err == nil {
+		defer keylog.Close()
 		return keylog.AppendEntry(entry)
 	}
 	return err

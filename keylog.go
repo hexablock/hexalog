@@ -59,10 +59,6 @@ func (keylog *Keylog) AppendEntry(entry *Entry) (err error) {
 	// index matter.
 	err = keylog.idx.Append(id, entry.Previous)
 
-	//
-	// TODO: Cleanup residual entries via some deferred process
-	//
-
 	return
 }
 
@@ -116,4 +112,9 @@ func (keylog *Keylog) Iter(seek []byte, cb func(id []byte, entry *Entry) error) 
 // GetIndex returns a KeylogIndex struct
 func (keylog *Keylog) GetIndex() UnsafeKeylogIndex {
 	return keylog.idx.Index()
+}
+
+// Close the underlying index
+func (keylog *Keylog) Close() error {
+	return keylog.idx.Close()
 }

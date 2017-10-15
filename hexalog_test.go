@@ -154,6 +154,9 @@ func TestHexalog(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Wait for all other nodes
+	<-time.After(400 * time.Millisecond)
+
 	if _, err = ts1.es.Get(i1); err != nil {
 		t.Fatal(err)
 	}
