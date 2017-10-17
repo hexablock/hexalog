@@ -310,10 +310,12 @@ func (trans *NetTransport) FetchKeylog(host string, entry *Entry, opts *RequestO
 		// TODO: validate
 		//
 
-		// Continue on if already have the entry
-		if _, err = trans.hlog.store.GetEntry(msg.Entry.Key, msg.ID); err == nil {
-			continue
-		}
+		// Continue on if already have the entry.  This should be checked against the
+		// index as the entry may exist but not been applied to the index.
+
+		// if _, err = trans.hlog.store.GetEntry(msg.Entry.Key, msg.ID); err == nil {
+		// 	continue
+		// }
 
 		if fentry, err = trans.hlog.append(msg.ID, msg.Entry); err != nil {
 			log.Printf("[ERROR] Fetch key entry key=%s height=%d error='%v'", entry.Key, entry.Height, err)
@@ -466,7 +468,7 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 			break
 		}
 
-		// Continue on if already have the entry
+		// Continue on if we already have the entry
 		if _, er := keylog.GetEntry(msg.ID); er != nil {
 			continue
 		}

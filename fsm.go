@@ -77,15 +77,16 @@ func newFsm(f FSM, ss StableStore, logstore *LogStore, hasher hexatype.Hasher) (
 	return fsm, nil
 }
 
-// apply queues the FutureEntry to the FSM.
+// apply queues the FutureEntry to be applied to the FSM.
 func (fsm *fsm) apply(entry *FutureEntry) {
 	// Start the future timer
 	entry.dispatch()
 	fsm.applyCh <- entry
 }
 
+// serialize operations to ensure the underly user supplied fsm is not called
+// concurrently
 func (fsm *fsm) startApply() {
-
 	for fentry := range fsm.applyCh {
 		var (
 			e1    error
@@ -105,11 +106,12 @@ func (fsm *fsm) startApply() {
 		}
 		// Commit the last fsm applied entry to stable store
 		e2 := fsm.ss.Set(entry.Key, fentry.ID())
-		// Signal future that we applied the entry supplying the app fsm response or any
-		// errors encountered
+		// Signal the future that we have applied the passing the user fsm response
+		// and/or error
 		e := mergeErrors(e1, e2)
 		fentry.applied(data, e)
-		//log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'", entry.Key, entry.Height, fentry.Runtime(), e)
+		//log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'",
+		// entry.Key, entry.Height, fentry.Runtime(), e)
 	}
 
 }

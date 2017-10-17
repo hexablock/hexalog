@@ -2,7 +2,6 @@ package hexalog
 
 import (
 	"bytes"
-	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -48,7 +47,7 @@ func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 	} else {
 		defer kl.Close()
 		if kl.Marker() != nil {
-			return 0, fmt.Errorf("key degraded")
+			return 0, hexatype.ErrKeyDegraded
 		}
 	}
 

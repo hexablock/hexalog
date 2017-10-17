@@ -159,8 +159,8 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
 		// Check for heal if previous hash mismatch
-		if err == hexatype.ErrPreviousHash {
-			// Try to heal if the new height is > then the current one.  THis prevents
+		if err == hexatype.ErrPreviousHash || err == hexatype.ErrKeyDegraded {
+			// Try to heal if the new height is > then the current one.  This prevents
 			// an infinite retry. If the height <= we do nothing
 			if entry.Height > prevHeight {
 				// Submit heal request

@@ -85,6 +85,8 @@ func (m *Entry) GetData() []byte {
 	return nil
 }
 
+// UnsafeKeylogIndex is an in-memory keylog index. This is the base class for all
+// implementations of KeylogIndex
 type UnsafeKeylogIndex struct {
 	Key     []byte   `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
 	Height  uint32   `protobuf:"varint,2,opt,name=Height" json:"Height,omitempty"`
