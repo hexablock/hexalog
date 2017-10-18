@@ -158,7 +158,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	// Verify entry
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
-		// Check for heal if previous hash mismatch
+		// Check for heal if previous hash mismatch or a degraded key i.e. marked key
 		if err == hexatype.ErrPreviousHash || err == hexatype.ErrKeyDegraded {
 			// Try to heal if the new height is > then the current one.  This prevents
 			// an infinite retry. If the height <= we do nothing
@@ -200,15 +200,19 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 			// Create a new key if height is zero. We ignore the error as it may already
 			// have been created
-			if prevHeight == 0 {
-				if kli, er := hlog.store.NewKey(entry.Key); er == nil {
-					kli.Close()
-				}
+			if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, opts); err != nil {
+				ballot.close(err)
+				return nil, err
 			}
-
-			// Broadcast proposal
-			hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-			hlog.ltime.Increment()
+			// if prevHeight == 0 {
+			// 	if kli, er := hlog.store.NewKey(entry.Key); er == nil {
+			// 		kli.Close()
+			// 	}
+			// }
+			//
+			// // Broadcast proposal
+			// hlog.pch <- &ReqResp{Entry: entry, Options: opts}
+			// hlog.ltime.Increment()
 		}
 
 	} else {
@@ -228,14 +232,18 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	if pvotes == 1 {
 		// Create a new key if height is 0 and we don't have the key.  We ignore the
 		// error as it may already have been created.
-		if prevHeight == 0 {
-			if kli, er := hlog.store.NewKey(entry.Key); er == nil {
-				kli.Close()
-			}
+		if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, opts); err != nil {
+			ballot.close(err)
+			return nil, err
 		}
-		// Broadcast proposal
-		hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-		hlog.ltime.Increment()
+		// if prevHeight == 0 {
+		// 	if kli, er := hlog.store.NewKey(entry.Key); er == nil {
+		// 		kli.Close()
+		// 	}
+		// }
+		// // Broadcast proposal
+		// hlog.pch <- &ReqResp{Entry: entry, Options: opts}
+		// hlog.ltime.Increment()
 
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)

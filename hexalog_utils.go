@@ -2,6 +2,7 @@ package hexalog
 
 import (
 	"bytes"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -9,11 +10,6 @@ import (
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
-
-//
-// This file contains hexalog functions that handle various aspects of maintaining
-// consistency.
-//
 
 // append appends the entry to the log.  If it succeeds is submits the entry to be applied
 // to the FSM otherwise returns an error.  This call bypasses the voting process and tries
@@ -189,4 +185,32 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 	}
 
 	// Do nothing as it may be a repetative vote
+}
+
+func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts *RequestOptions) error {
+	if prevHeight == 0 {
+
+		kli, err := hlog.store.NewKey(entry.Key)
+		if err == nil {
+			kli.Close()
+		} else if err != hexatype.ErrKeyExists {
+			// Ignore key exists error
+			return err
+		}
+
+	}
+
+	// Broadcast proposal
+	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
+	hlog.ltime.Increment()
+	return nil
+}
+
+func mergeErrors(e1, e2 error) (err error) {
+	if e1 != nil && e2 != nil {
+		return fmt.Errorf("%v; %v", e1, e2)
+	} else if e1 != nil {
+		return e1
+	}
+	return e2
 }

@@ -51,7 +51,7 @@ type fsm struct {
 	applyCh chan *FutureEntry
 	// Stable store to track which entries have been applied to the fsm.
 	ss StableStore
-	// log store to compare against
+	// log store contains all accepted entries
 	ls *LogStore
 	// hash function to use
 	hasher hexatype.Hasher
@@ -62,7 +62,7 @@ type fsm struct {
 func newFsm(f FSM, ss StableStore, logstore *LogStore, hasher hexatype.Hasher) (*fsm, error) {
 	fsm := &fsm{
 		f:       f,
-		applyCh: make(chan *FutureEntry),
+		applyCh: make(chan *FutureEntry, 16),
 		ss:      ss,
 		ls:      logstore,
 		hasher:  hasher,
@@ -72,21 +72,21 @@ func newFsm(f FSM, ss StableStore, logstore *LogStore, hasher hexatype.Hasher) (
 		return nil, err
 	}
 
-	go fsm.startApply()
+	go fsm.start()
 
 	return fsm, nil
 }
 
-// apply queues the FutureEntry to be applied to the FSM.
+// apply queues the FutureEntry to be applied to the FSM.  It starts the dispatch timer
+// on the future and queues it
 func (fsm *fsm) apply(entry *FutureEntry) {
 	// Start the future timer
 	entry.dispatch()
 	fsm.applyCh <- entry
 }
 
-// serialize operations to ensure the underly user supplied fsm is not called
-// concurrently
-func (fsm *fsm) startApply() {
+// serialize operations to underlying user supplied fsm
+func (fsm *fsm) start() {
 	for fentry := range fsm.applyCh {
 		var (
 			e1    error
@@ -100,7 +100,6 @@ func (fsm *fsm) startApply() {
 			if e, ok := resp.(error); ok {
 				e1 = e
 			} else {
-				// Set the app fsm response
 				data = resp
 			}
 		}
@@ -108,8 +107,8 @@ func (fsm *fsm) startApply() {
 		e2 := fsm.ss.Set(entry.Key, fentry.ID())
 		// Signal the future that we have applied the passing the user fsm response
 		// and/or error
-		e := mergeErrors(e1, e2)
-		fentry.applied(data, e)
+		fentry.applied(data, mergeErrors(e1, e2))
+
 		//log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'",
 		// entry.Key, entry.Height, fentry.Runtime(), e)
 	}
