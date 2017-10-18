@@ -23,7 +23,7 @@
   branch = "master"
   name = "github.com/hexablock/hexatype"
   packages = ["."]
-  revision = "02d68deefd714b75e89142f914f1382b076e4d21"
+  revision = "d763b100c44bedd66d05b8b564b27fec84a1f949"
 
 [[projects]]
   branch = "master"
