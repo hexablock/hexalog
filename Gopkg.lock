@@ -9,18 +9,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/hexablock/go-chord"
-  packages = [".","coordinate"]
-  revision = "9c1aef7ceda9abea24f7a3cec6c5f1c290e5d32c"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/hexablock/hexaring"
-  packages = ["."]
-  revision = "7d3a64016e84ab2668cbca22e75b2d32fc9a15c8"
-
-[[projects]]
-  branch = "master"
   name = "github.com/hexablock/hexatype"
   packages = ["."]
   revision = "d763b100c44bedd66d05b8b564b27fec84a1f949"
@@ -64,6 +52,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "57a01affe789b1c26778a7563fcaea8de632c526dcdbf4d0dc49bd6dcb5ecd0f"
+  inputs-digest = "caf23e7ab73902bf2aec96500b600abec0b6b3bbf892cffbd005ca67be9f28f2"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -5,15 +5,14 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
 // sendProposal makes a single proposal request to a location.  if a hexatype.ErrPreviousHash
 // error is returned a  heal request is submitted
-func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *hexaring.Location, idx int, opts *RequestOptions) error {
-	host := loc.Vnode.Host
+func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Participant, idx int, opts *RequestOptions) error {
+	host := loc.Host
 	o := opts.CloneWithSourceIndex(int32(idx))
 
 	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
@@ -51,7 +50,7 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error 
 			continue
 		}
 
-		go func(ent *Entry, loc *hexaring.Location, i int, o *RequestOptions) {
+		go func(ent *Entry, loc *Participant, i int, o *RequestOptions) {
 			resp <- hlog.sendProposal(ctx, ent, loc, i, o)
 		}(entry, p, idx, opts)
 
@@ -106,9 +105,9 @@ func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 			continue
 		}
 
-		go func(ent *Entry, loc *hexaring.Location, i int, opt *RequestOptions) {
+		go func(ent *Entry, loc *Participant, i int, opt *RequestOptions) {
 			o := opt.CloneWithSourceIndex(int32(i))
-			host := loc.Vnode.Host
+			host := loc.Host
 
 			log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
 			resp <- hlog.trans.CommitEntry(ctx, host, ent, o)

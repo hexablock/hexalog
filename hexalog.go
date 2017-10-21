@@ -194,7 +194,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		// Cast a vote for ourself if we are not the SourceIndex, on top of casting the remote
 		// vote taking place below
 		if idx != int(opts.SourceIndex) {
-			if _, err = ballot.votePropose(id, string(loc.Vnode.Id)); err != nil {
+			if _, err = ballot.votePropose(id, loc.Host); err != nil {
 				return nil, err
 			}
 
@@ -219,8 +219,8 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		hlog.mu.Unlock()
 	}
 
-	vid := opts.SourcePeer().Vnode.Id
-	pvotes, err := ballot.votePropose(id, string(vid))
+	vid := opts.SourcePeer().Host
+	pvotes, err := ballot.votePropose(id, vid)
 
 	log.Printf("[DEBUG] Propose ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
@@ -249,7 +249,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
 		// Start local commit phase.  We use our index as the voter
 		var cvotes int
-		cvotes, err = ballot.voteCommit(id, string(opts.PeerSet[idx].Vnode.Id))
+		cvotes, err = ballot.voteCommit(id, opts.PeerSet[idx].Host)
 		if err == nil {
 			// Take action if we have the required commits by appending the log entry and calling
 			// app fsm.Apply
@@ -293,8 +293,8 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	//
 
 	sloc := opts.SourcePeer()
-	vid := sloc.Vnode.Id
-	votes, err := ballot.voteCommit(id, string(vid))
+	vid := sloc.Host
+	votes, err := ballot.voteCommit(id, vid)
 	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
@@ -315,10 +315,6 @@ func (hlog *Hexalog) Heal(key []byte, opts *RequestOptions) error {
 	if err := hlog.checkOptions(opts); err != nil {
 		return err
 	}
-	// locs := hexaring.LocationSet(opts.PeerSet)
-	// if _, err := locs.GetByHost(hlog.conf.Hostname); err != nil {
-	// 	return err
-	// }
 
 	ent := &Entry{Key: key}
 	hlog.hch <- &ReqResp{Options: opts, Entry: ent}

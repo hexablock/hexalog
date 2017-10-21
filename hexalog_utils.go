@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -144,9 +143,9 @@ func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
 }
 
 // getSelfIndex gets the index of this node in the PeerSet
-func (hlog *Hexalog) getSelfIndex(peerset []*hexaring.Location) (int, bool) {
+func (hlog *Hexalog) getSelfIndex(peerset []*Participant) (int, bool) {
 	for i, p := range peerset {
-		if p.Vnode.Host == hlog.conf.Hostname {
+		if p.Host == hlog.conf.Hostname {
 			return i, true
 		}
 	}

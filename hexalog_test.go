@@ -9,45 +9,55 @@ import (
 
 	"google.golang.org/grpc"
 
-	chord "github.com/hexablock/go-chord"
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
 )
 
 var (
 	testOpts = &RequestOptions{
-		PeerSet: []*hexaring.Location{
-			{ID: []byte("1"),
-				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:43211"}},
-			{ID: []byte("2"),
-				Vnode: &chord.Vnode{Id: []byte("2"), Host: "127.0.0.1:43212"}},
-			{ID: []byte("3"),
-				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:43213"}},
+		PeerSet: []*Participant{
+			{
+				ID:   []byte("1"),
+				Host: "127.0.0.1:43211",
+			},
+			{
+				ID:   []byte("2"),
+				Host: "127.0.0.1:43212",
+			},
+			{
+				ID:   []byte("3"),
+				Host: "127.0.0.1:43213",
+			},
 		},
 	}
 	testOpts1 = &RequestOptions{
-		PeerSet: []*hexaring.Location{
-			{ID: []byte("1"),
-				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:53211"}},
-			{ID: []byte("2"),
-				Vnode: &chord.Vnode{Id: []byte("2"), Host: "127.0.0.1:53212"}},
-			{ID: []byte("3"),
-				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:53213"}},
+		PeerSet: []*Participant{
+			{
+				ID:   []byte("1"),
+				Host: "127.0.0.1:53211",
+			},
+			{
+				ID:   []byte("2"),
+				Host: "127.0.0.1:53212",
+			},
+			{
+				ID:   []byte("3"),
+				Host: "127.0.0.1:53213",
+			},
 		},
 	}
 	testOpts2 = &RequestOptions{
-		PeerSet: []*hexaring.Location{
+		PeerSet: []*Participant{
 			{
-				ID:    []byte("1"),
-				Vnode: &chord.Vnode{Id: []byte("1"), Host: "127.0.0.1:8997"},
+				ID:   []byte("1"),
+				Host: "127.0.0.1:8997",
 			},
 			{
-				ID:    []byte("2"),
-				Vnode: &chord.Vnode{Id: []byte("2"), Host: "127.0.0.1:9997"},
+				ID:   []byte("2"),
+				Host: "127.0.0.1:9997",
 			},
 			{
-				ID:    []byte("3"),
-				Vnode: &chord.Vnode{Id: []byte("3"), Host: "127.0.0.1:10997"},
+				ID:   []byte("3"),
+				Host: "127.0.0.1:10997",
 			},
 		},
 	}

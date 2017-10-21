@@ -1,7 +1,5 @@
 package hexalog
 
-import "github.com/hexablock/hexaring"
-
 // DefaultRequestOptions returns sane options for a request.  The PeerSet
 // still must be set if needed.
 func DefaultRequestOptions() *RequestOptions {
@@ -16,7 +14,7 @@ func DefaultRequestOptions() *RequestOptions {
 func (o *RequestOptions) CloneWithSourceIndex(idx int32) *RequestOptions {
 	opts := &RequestOptions{
 		SourceIndex:   idx,
-		PeerSet:       make([]*hexaring.Location, len(o.PeerSet)),
+		PeerSet:       make([]*Participant, len(o.PeerSet)),
 		RetryInterval: o.RetryInterval,
 		Retries:       o.Retries,
 		LTime:         o.LTime,
@@ -27,11 +25,6 @@ func (o *RequestOptions) CloneWithSourceIndex(idx int32) *RequestOptions {
 }
 
 // SourcePeer returns the peer for the source index
-func (o *RequestOptions) SourcePeer() *hexaring.Location {
+func (o *RequestOptions) SourcePeer() *Participant {
 	return o.PeerSet[o.SourceIndex]
-}
-
-// LocationSet returns the peer locations as a LocationSet
-func (o *RequestOptions) LocationSet() hexaring.LocationSet {
-	return hexaring.LocationSet(o.PeerSet)
 }

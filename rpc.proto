@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package hexalog;
 
-//import "github.com/hexablock/hexatype/types.proto";
-import "github.com/hexablock/hexaring/structs.proto";
-
 service HexalogRPC {
     rpc ProposeRPC(ReqResp) returns (ReqResp) {}
     rpc CommitRPC(ReqResp) returns (ReqResp) {}
@@ -46,7 +43,7 @@ message RequestOptions {
     // Index of the source in the PeerSet.  This is set internally by the log
     int32 SourceIndex = 1;
     // Set of peers for the request.
-    repeated hexaring.Location PeerSet = 2;
+    repeated Participant PeerSet = 2;
     // Number of times to retry for a given request
     int32 Retries = 3;
     // Retry interval for entry proposals
@@ -60,4 +57,14 @@ message RequestOptions {
     int32 WaitApplyTimeout = 7;
     // Lamport time
     uint64 LTime = 8;
+}
+
+message Participant {
+    bytes ID = 1;
+    // Priority among locations in a set
+    int32 Priority = 2;
+    // Index within location group
+    int32 Index = 3;
+    // Host:port
+    string Host = 4;
 }

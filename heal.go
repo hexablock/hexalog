@@ -3,12 +3,11 @@ package hexalog
 import (
 	"bytes"
 
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
-func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
+func (hlog *Hexalog) heal(key []byte, locs []*Participant) error {
 
 	leader, err := hlog.Leader(key, locs)
 	if err != nil {
@@ -25,7 +24,7 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 	lloc := leader.Location()
 
 	// We are the leader, so nothing to do
-	if lloc.Host() == hlog.conf.Hostname {
+	if lloc.Host == hlog.conf.Hostname {
 		return nil
 	}
 
@@ -59,7 +58,7 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 
 	// Fetch if there is a mismatch.
 	if bytes.Compare(slh, llh) != 0 {
-		_, er := hlog.trans.FetchKeylog(lloc.Host(), last, nil)
+		_, er := hlog.trans.FetchKeylog(lloc.Host, last, nil)
 		return mergeErrors(err, er)
 	}
 
@@ -71,7 +70,7 @@ func (hlog *Hexalog) heal(key []byte, locs hexaring.LocationSet) error {
 		if ok {
 			log.Printf("[INFO] Key consistent key=%s", key)
 		} else {
-			log.Printf("[TODO] Key inconsistent key=%s host=%s", key, loc.Host())
+			log.Printf("[TODO] Key inconsistent key=%s host=%s", key, loc.Host)
 		}
 
 	} else {

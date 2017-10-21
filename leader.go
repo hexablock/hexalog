@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 )
 
 // Leader returns the leader for a key.  It gets the last entry from the given location
 // set and finds the one with the max height which it considered to be the leader.
 // This is technically the pseudo-leader
-func (hlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*KeyLeader, error) {
+func (hlog *Hexalog) Leader(key []byte, locs []*Participant) (*KeyLeader, error) {
 	l := len(locs)
 
 	// Get last entry for a key from each location
@@ -20,12 +19,12 @@ func (hlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*KeyLeader, 
 	for i := 0; i < l; i++ {
 
 		loc := locs[i]
-		if loc.Vnode.Host == hlog.conf.Hostname {
+		if loc.Host == hlog.conf.Hostname {
 			lasts[i] = hlog.store.LastEntry(key)
 			continue
 		}
 
-		entry, err := hlog.trans.LastEntry(loc.Vnode.Host, key, &RequestOptions{})
+		entry, err := hlog.trans.LastEntry(loc.Host, key, &RequestOptions{})
 		if err == nil && entry != nil {
 			lasts[i] = entry
 		}
@@ -58,11 +57,11 @@ func (hlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*KeyLeader, 
 
 // KeyLeader represens a leader for a key for a location set.
 type KeyLeader struct {
-	key    []byte               // key in question
-	idx    int                  // leader index in the set for locs and lasts
-	locs   hexaring.LocationSet // participating locations
-	lasts  []*Entry             // last entry from each participant
-	hasher hexatype.Hasher      // hash function
+	key    []byte          // key in question
+	idx    int             // leader index in the set for locs and lasts
+	locs   []*Participant  // participating locations
+	lasts  []*Entry        // last entry from each participant
+	hasher hexatype.Hasher // hash function
 }
 
 // Key returns the key in question
@@ -74,7 +73,7 @@ func (l *KeyLeader) Key() []byte {
 // entries for each location are the same.  If consistent the natural key
 // location is returned; if the key is inconsistent then the first
 // inconsistent location is returned.
-func (l *KeyLeader) IsConsistent() (bool, *hexaring.Location) {
+func (l *KeyLeader) IsConsistent() (bool, *Participant) {
 	// Use leader id to compare against
 	id := l.lasts[l.idx].Hash(l.hasher.New())
 	for i, ent := range l.lasts {
@@ -97,12 +96,12 @@ func (l *KeyLeader) IsConsistent() (bool, *hexaring.Location) {
 }
 
 // LocationSet returns a slice of participating locations
-func (l *KeyLeader) LocationSet() hexaring.LocationSet {
+func (l *KeyLeader) LocationSet() []*Participant {
 	return l.locs
 }
 
 // Location returns the Location of the leader
-func (l *KeyLeader) Location() *hexaring.Location {
+func (l *KeyLeader) Location() *Participant {
 	return l.locs[l.idx]
 }
 
@@ -120,7 +119,7 @@ func (l *KeyLeader) Entries() []*Entry {
 func (l KeyLeader) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Key    string
-		Leader *hexaring.Location
+		Leader *Participant
 		Entry  *Entry
 	}{string(l.key), l.Location(), l.LastEntry()})
 }

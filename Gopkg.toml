@@ -27,14 +27,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/hexablock/go-chord"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/hexablock/hexaring"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/hexablock/hexatype"
 
 [[constraint]]
