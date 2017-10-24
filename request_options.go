@@ -4,8 +4,6 @@ package hexalog
 // still must be set if needed.
 func DefaultRequestOptions() *RequestOptions {
 	return &RequestOptions{
-		RetryInterval:    20, // msec
-		Retries:          3,
 		WaitApplyTimeout: 2000, // msec
 	}
 }
@@ -13,11 +11,9 @@ func DefaultRequestOptions() *RequestOptions {
 // CloneWithSourceIndex clones RequestOptions assigning it the provided idx as the SourceIndex
 func (o *RequestOptions) CloneWithSourceIndex(idx int32) *RequestOptions {
 	opts := &RequestOptions{
-		SourceIndex:   idx,
-		PeerSet:       make([]*Participant, len(o.PeerSet)),
-		RetryInterval: o.RetryInterval,
-		Retries:       o.Retries,
-		LTime:         o.LTime,
+		SourceIndex: idx,
+		PeerSet:     make([]*Participant, len(o.PeerSet)),
+		LTime:       o.LTime,
 	}
 	copy(opts.PeerSet, o.PeerSet)
 

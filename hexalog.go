@@ -110,17 +110,6 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 	return hlog, nil
 }
 
-// Stats returns internal information of the log regarding its current activity
-func (hlog *Hexalog) Stats() *Stats {
-	stats := hlog.store.Stats()
-	stats.Ballots = len(hlog.ballots)
-	stats.Proposals = len(hlog.pch)
-	stats.Commits = len(hlog.cch)
-	stats.Heals = len(hlog.hch)
-
-	return stats
-}
-
 func (hlog *Hexalog) start() {
 	// Increment LamportClock on start
 	hlog.ltime.Increment()
@@ -131,6 +120,17 @@ func (hlog *Hexalog) start() {
 	go hlog.broadcastCommits()
 	go hlog.healKeys()
 	go hlog.reapBallots()
+}
+
+// Stats returns internal information of the log regarding its current activity
+func (hlog *Hexalog) Stats() *Stats {
+	stats := hlog.store.Stats()
+	stats.Ballots = len(hlog.ballots)
+	stats.Proposals = len(hlog.pch)
+	stats.Commits = len(hlog.cch)
+	stats.Heals = len(hlog.hch)
+
+	return stats
 }
 
 // New returns a new Entry to be appended to the log for the given key.
@@ -204,15 +204,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 				ballot.close(err)
 				return nil, err
 			}
-			// if prevHeight == 0 {
-			// 	if kli, er := hlog.store.NewKey(entry.Key); er == nil {
-			// 		kli.Close()
-			// 	}
-			// }
-			//
-			// // Broadcast proposal
-			// hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-			// hlog.ltime.Increment()
+
 		}
 
 	} else {
@@ -230,20 +222,12 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	}
 
 	if pvotes == 1 {
-		// Create a new key if height is 0 and we don't have the key.  We ignore the
-		// error as it may already have been created.
+		// Create a new key if height is 0 and we don't have the key.  We ignore
+		// the error as it may already have been created.
 		if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, opts); err != nil {
 			ballot.close(err)
 			return nil, err
 		}
-		// if prevHeight == 0 {
-		// 	if kli, er := hlog.store.NewKey(entry.Key); er == nil {
-		// 		kli.Close()
-		// 	}
-		// }
-		// // Broadcast proposal
-		// hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-		// hlog.ltime.Increment()
 
 	} else if pvotes == hlog.conf.Votes {
 		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
@@ -251,16 +235,18 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		var cvotes int
 		cvotes, err = ballot.voteCommit(id, opts.PeerSet[idx].Host)
 		if err == nil {
-			// Take action if we have the required commits by appending the log entry and calling
-			// app fsm.Apply
+			// Take action if we have the required commits by appending the log
+			// entry and calling app fsm.Apply
 			hlog.checkCommitAndAct(cvotes, ballot, id, entry, opts)
 
 		} else {
 
 			// We rollback here as we appended but the vote failed
-			log.Printf("[INFO] Rolling back key=%s height=%d id=%x", entry.Key, entry.Height, id)
+			log.Printf("[INFO] Rolling back key=%s height=%d id=%x",
+				entry.Key, entry.Height, id)
 			if er := hlog.store.RollbackEntry(entry); er != nil {
-				log.Printf("[ERROR] Rollback failed key=%s height=%d error='%v'", entry.Key, entry.Height, er)
+				log.Printf("[ERROR] Rollback failed key=%s height=%d error='%v'",
+					entry.Key, entry.Height, er)
 			}
 
 		}
@@ -309,8 +295,8 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	return ballot, nil
 }
 
-// Heal submits a heal request for the given key.  It returns an error if the options are
-// invalid.
+// Heal submits a heal request for the given key.  It returns an error if the
+// options are invalid.
 func (hlog *Hexalog) Heal(key []byte, opts *RequestOptions) error {
 	if err := hlog.checkOptions(opts); err != nil {
 		return err
@@ -322,10 +308,11 @@ func (hlog *Hexalog) Heal(key []byte, opts *RequestOptions) error {
 	return nil
 }
 
-// Shutdown signals a shutdown and waits for all go-routines to exit before returning.  It
-// will take atleast the amount of time specified as the ballot reap interval as shutdown
-// for the ballot reaper is checked at the top of the loop.  It does not shutdown the
-// stores as they may be in use by other components
+// Shutdown signals a shutdown and waits for all go-routines to exit before
+// returning.  It will take atleast the amount of time specified as the ballot
+// reap interval as shutdown for the ballot reaper is checked at the top of the
+// loop.  It does not shutdown the stores as they may be in use by other
+// components
 func (hlog *Hexalog) Shutdown() {
 	atomic.StoreInt32(&hlog.shutdown, 1)
 

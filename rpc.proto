@@ -44,10 +44,6 @@ message RequestOptions {
     int32 SourceIndex = 1;
     // Set of peers for the request.
     repeated Participant PeerSet = 2;
-    // Number of times to retry for a given request
-    int32 Retries = 3;
-    // Retry interval for entry proposals
-    int32 RetryInterval = 4;
     // Wait on ballot before returning
     bool WaitBallot = 5;
     // Wait for fsm to apply entry after ballot is closed. This should take
@@ -61,10 +57,11 @@ message RequestOptions {
 
 message Participant {
     bytes ID = 1;
-    // Priority among locations in a set
-    int32 Priority = 2;
-    // Index within location group
-    int32 Index = 3;
     // Host:port
-    string Host = 4;
+    string Host = 2;
+    // Priority among locations in a set
+    int32 Priority = 3;
+    // Index within location group
+    int32 Index = 4;
+
 }

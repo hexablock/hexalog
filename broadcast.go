@@ -19,6 +19,7 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Partic
 	err := hlog.trans.ProposeEntry(ctx, host, entry, o)
 
 	switch err {
+
 	case hexatype.ErrPreviousHash:
 		hlog.hch <- &ReqResp{
 			Options: opts,

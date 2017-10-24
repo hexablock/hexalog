@@ -105,6 +105,7 @@ func (fsm *fsm) start() {
 		}
 		// Commit the last fsm applied entry to stable store
 		e2 := fsm.ss.Set(entry.Key, fentry.ID())
+
 		// Signal the future that we have applied the passing the user fsm response
 		// and/or error
 		fentry.applied(data, mergeErrors(e1, e2))
