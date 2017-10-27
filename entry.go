@@ -13,6 +13,7 @@ func (entry *Entry) Clone() *Entry {
 		Key:       entry.Key,
 		Previous:  entry.Previous,
 		Timestamp: entry.Timestamp,
+		LTime:     entry.LTime,
 		Height:    entry.Height,
 		Data:      entry.Data,
 	}
@@ -25,11 +26,13 @@ func (entry Entry) MarshalJSON() ([]byte, error) {
 		Previous  string
 		Height    uint32
 		Timestamp uint64
+		LTime     uint64
 		Data      []byte
 	}{
 		Key:       entry.Key,
 		Previous:  hex.EncodeToString(entry.Previous),
 		Timestamp: entry.Timestamp,
+		LTime:     entry.LTime,
 		Height:    entry.Height,
 		Data:      entry.Data,
 	}
@@ -40,6 +43,7 @@ func (entry Entry) MarshalJSON() ([]byte, error) {
 func (entry *Entry) Hash(hashFunc hash.Hash) []byte {
 	hashFunc.Write(entry.Previous)
 	binary.Write(hashFunc, binary.BigEndian, entry.Timestamp)
+	binary.Write(hashFunc, binary.BigEndian, entry.LTime)
 	binary.Write(hashFunc, binary.BigEndian, entry.Height)
 	hashFunc.Write(entry.Key)
 	hashFunc.Write(entry.Data)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 )
 
+// MarshalJSON is used to marshal id to hex string
 func (part Participant) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		ID       string

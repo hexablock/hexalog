@@ -14,20 +14,27 @@ service HexalogRPC {
 
 // Hexalog entry
 message Entry {
-    bytes Previous = 1;
-    uint64 Timestamp = 2;
+    bytes Key = 1;
+    bytes Previous = 2;
     uint32 Height = 3;
-    bytes Key = 4;
-    bytes Data = 5;
+    uint64 Timestamp = 4;
+    uint64 LTime = 5;
+    bytes Data = 6;
 }
 
 // UnsafeKeylogIndex is an in-memory keylog index. This is the base class for all
 // implementations of KeylogIndex
 message UnsafeKeylogIndex {
-    bytes Key = 1;              // key for the index
-    uint32 Height = 2;          // Current height of the keylog
-    bytes Marker = 3;           // this is used to mark incomplete or whatever
-    repeated bytes Entries = 4; // entry ids
+    // Key for the index
+    bytes Key = 1;
+    // Current height of the keylog
+    uint32 Height = 2;
+    // Used to mark an incomplete log
+    bytes Marker = 3;
+    // LamportClock based on the last write
+    uint64 LTime = 4;
+    // Entry ids
+    repeated bytes Entries = 5;
 }
 
 // Request and response shared structure for hexalog
@@ -66,5 +73,4 @@ message Participant {
     int32 Priority = 3;
     // Index within location group
     int32 Index = 4;
-
 }

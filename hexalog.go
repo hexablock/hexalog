@@ -148,7 +148,9 @@ func (hlog *Hexalog) Stats() *Stats {
 
 // New returns a new Entry to be appended to the log for the given key.
 func (hlog *Hexalog) New(key []byte) *Entry {
-	return hlog.store.NewEntry(key)
+	entry := hlog.store.NewEntry(key)
+	entry.LTime = uint64(hlog.ltime.Time())
+	return entry
 }
 
 // Propose proposes an entry to the log.  It votes on a ballot if it exists or creates one
