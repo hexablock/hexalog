@@ -47,12 +47,12 @@ func (hlog *Hexalog) verifyEntry(entry *Entry) (prevHeight uint32, err error) {
 	}
 
 	// Set the default last id to a zero hash
-	lastID := make([]byte, hlog.conf.Hasher.Size())
+	lastID := make([]byte, hlog.conf.hashSize)
 	// Try to get the last entry
 	last := hlog.store.LastEntry(entry.Key)
 	if last != nil {
 		prevHeight = last.Height
-		lastID = last.Hash(hlog.conf.Hasher.New())
+		lastID = last.Hash(hlog.conf.Hasher())
 	}
 
 	// Check the previous hash
@@ -136,6 +136,7 @@ func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
 	if opts.PeerSet == nil || len(opts.PeerSet) < hlog.conf.Votes {
 		return hexatype.ErrInsufficientPeers
 	}
+
 	hlog.ltime.Witness(hexatype.LamportTime(opts.LTime))
 	opts.LTime = uint64(hlog.ltime.Time())
 
@@ -202,6 +203,7 @@ func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts
 	// Broadcast proposal
 	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 	hlog.ltime.Increment()
+
 	return nil
 }
 

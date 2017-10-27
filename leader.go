@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-
-	"github.com/hexablock/hexatype"
+	"hash"
 )
 
 // Leader returns the leader for a key.  It gets the last entry from the given location
@@ -57,11 +56,11 @@ func (hlog *Hexalog) Leader(key []byte, locs []*Participant) (*KeyLeader, error)
 
 // KeyLeader represens a leader for a key for a location set.
 type KeyLeader struct {
-	key    []byte          // key in question
-	idx    int             // leader index in the set for locs and lasts
-	locs   []*Participant  // participating locations
-	lasts  []*Entry        // last entry from each participant
-	hasher hexatype.Hasher // hash function
+	key    []byte           // key in question
+	idx    int              // leader index in the set for locs and lasts
+	locs   []*Participant   // participating locations
+	lasts  []*Entry         // last entry from each participant
+	hasher func() hash.Hash // hash function
 }
 
 // Key returns the key in question
@@ -75,7 +74,7 @@ func (l *KeyLeader) Key() []byte {
 // inconsistent location is returned.
 func (l *KeyLeader) IsConsistent() (bool, *Participant) {
 	// Use leader id to compare against
-	id := l.lasts[l.idx].Hash(l.hasher.New())
+	id := l.lasts[l.idx].Hash(l.hasher())
 	for i, ent := range l.lasts {
 		if i == l.idx {
 			continue
@@ -85,7 +84,7 @@ func (l *KeyLeader) IsConsistent() (bool, *Participant) {
 			return false, l.locs[i]
 		}
 
-		nid := ent.Hash(l.hasher.New())
+		nid := ent.Hash(l.hasher())
 		if bytes.Compare(id, nid) != 0 {
 			// Return inconsistent location
 			return false, l.locs[i]

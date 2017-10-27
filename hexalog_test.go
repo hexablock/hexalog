@@ -82,6 +82,7 @@ type testServer struct {
 }
 
 func (server *testServer) start() {
+	//log.Println("LN", server.ln)
 	go server.s.Serve(server.ln)
 }
 
@@ -112,13 +113,20 @@ func (server *testServer) initStorage() {
 	server.fsm = &EchoFSM{}
 }
 
-func initTestServer(addr string) *testServer {
+func initTestServer(addr string) (*testServer, error) {
 	ts := &testServer{}
-	ts.ln, _ = net.Listen("tcp", addr)
+	var err error
+	ts.ln, err = net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
 	ts.s = grpc.NewServer()
 
 	ts.conf = initConf(addr)
-	ts.datadir, _ = ioutil.TempDir("/tmp", "hexalog-")
+	ts.datadir, err = ioutil.TempDir("/tmp", "hexalog-")
+	if err != nil {
+		return nil, err
+	}
 
 	// Set to low value to allow reaper testing
 	trans := NewNetTransport(500*time.Millisecond, 3*time.Second)
@@ -126,11 +134,11 @@ func initTestServer(addr string) *testServer {
 
 	ts.initStorage()
 
-	ts.hlog, _ = NewHexalog(ts.conf, ts.fsm, ts.ls, ts.ss, trans)
+	if ts.hlog, err = NewHexalog(ts.conf, ts.fsm, ts.ls, ts.ss, trans); err == nil {
+		ts.start()
+	}
 
-	ts.start()
-
-	return ts
+	return ts, err
 }
 
 func TestMain(m *testing.M) {
@@ -140,16 +148,25 @@ func TestMain(m *testing.M) {
 }
 
 func TestHexalog(t *testing.T) {
-	ts1 := initTestServer("127.0.0.1:8997")
-	ts2 := initTestServer("127.0.0.1:9997")
-	ts3 := initTestServer("127.0.0.1:10997")
+	ts1, err := initTestServer("127.0.0.1:8997")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts2, err := initTestServer("127.0.0.1:9997")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts3, err := initTestServer("127.0.0.1:10997")
+	if err != nil {
+		t.Fatal(err)
+	}
 	<-time.After(1 * time.Second)
 
 	testkey := []byte("hexalog-key")
 	testdata := []byte("hexalog-data")
 	ent1 := ts1.hlog.New(testkey)
 	ent1.Data = testdata
-	i1 := ent1.Hash(ts1.conf.Hasher.New())
+	i1 := ent1.Hash(ts1.conf.Hasher())
 
 	ballot, err := ts2.hlog.Propose(ent1, testOpts2)
 	if err != nil {
@@ -187,6 +204,8 @@ func TestHexalog(t *testing.T) {
 	}
 
 	t.Logf("%+v", ts2.hlog.Stats())
+
+	<-time.After(3 * time.Second)
 
 	ts1.hlog.Shutdown()
 	ts2.hlog.Shutdown()

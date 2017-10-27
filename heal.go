@@ -42,7 +42,7 @@ func (hlog *Hexalog) heal(key []byte, locs []*Participant) error {
 	defer keylog.Close()
 
 	var (
-		h    = hlog.conf.Hasher.New()
+		h    = hlog.conf.Hasher()
 		llh  = lle.Hash(h)
 		slh  []byte
 		last = keylog.LastEntry()

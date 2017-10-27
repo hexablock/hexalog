@@ -10,9 +10,18 @@ import (
 
 func TestNetTransport(t *testing.T) {
 
-	s1 := initTestServer("127.0.0.1:43211")
-	s2 := initTestServer("127.0.0.1:43212")
-	s3 := initTestServer("127.0.0.1:43213")
+	s1, err := initTestServer("127.0.0.1:43211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := initTestServer("127.0.0.1:43212")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := initTestServer("127.0.0.1:43213")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	//s4 := initTestServer("127.0.0.1:43214")
 
@@ -34,13 +43,13 @@ func TestNetTransport(t *testing.T) {
 	t.Logf("time ballot=%v fsm=%v", ballot.Runtime(), ballot.fentry.Runtime())
 	<-time.After(50 * time.Millisecond)
 
-	id := entry.Hash(s1.hlog.conf.Hasher.New())
+	id := entry.Hash(s1.hlog.conf.Hasher())
 	e2, err := s1.hlog.trans.GetEntry("127.0.0.1:43212", []byte("testkey"), id, &RequestOptions{})
 	if err != nil {
 		t.Fatalf("key=testkey id=%x %v", id, err)
 	}
 
-	id2 := e2.Hash(s1.hlog.conf.Hasher.New())
+	id2 := e2.Hash(s1.hlog.conf.Hasher())
 	if bytes.Compare(id, id2) != 0 {
 		t.Error("id mismatch")
 	}

@@ -36,6 +36,9 @@ message ReqResp {
     bytes ID = 1;
     Entry Entry = 2;
     RequestOptions Options = 3;
+    // Response fields
+    int64 BallotTime = 4; // ns
+    int64 ApplyTime  = 5; // ns
 }
 
 // Hexalog request options

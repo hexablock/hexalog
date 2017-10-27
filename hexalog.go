@@ -24,13 +24,14 @@ type Stats struct {
 
 // Transport implements a Hexalog network transport
 type Transport interface {
+	NewEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
 	// Gets an entry from a remote host
 	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
 	// Get last entry for the key
 	LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
 	// Proposes an entry on the remote host
-	ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error
-	// Commits an entry on the remote host
+	ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) (*ReqResp, error)
+	// Commits an entry on the remote host.  This is not directly called by the user
 	CommitEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error
 	// Transfers a complete key log to the remote host
 	TransferKeylog(host string, key []byte, opts *RequestOptions) error
@@ -46,28 +47,38 @@ type Transport interface {
 // all other aspects pertaining to consistency
 type Hexalog struct {
 	conf *Config
+
 	// Lamport clock
 	ltime *hexatype.LamportClock
+
 	// Internal fsm.  This wraps the application FSM from the config
 	fsm *fsm
+
 	// Underlying transport
 	trans Transport
+
 	// The store containing log entires that are committed, but not necessary applied
 	// to the FSM
 	store *LogStore
+
 	// Currently active ballots
 	mu      sync.RWMutex
 	ballots map[string]*Ballot
+
 	// Propose broadcast channel to broadcast proposals to the network peer set
 	pch chan *ReqResp
+
 	// Commit broadcast channel to broadcast commits to the network peer set
 	cch chan *ReqResp
+
 	// Channel for heal requests.  When previous hash mismatches occur, the log will send
 	// a request down this channel to allow applications to try to recover. This is
 	// usually the case when a keylog falls behind.
 	hch chan *ReqResp
+
 	// Gets set when once a shutdown is signalled
 	shutdown int32
+
 	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
 	// queue is not part of this number
 	shutdownCh chan struct{}
@@ -76,6 +87,8 @@ type Hexalog struct {
 // NewHexalog initializes a new Hexalog and starts the entry broadcaster
 func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore StableStore,
 	trans Transport) (*Hexalog, error) {
+
+	conf.hashSize = conf.Hasher().Size()
 
 	// Init internal FSM that manages the user provided application fsm
 	ifsm, err := newFsm(appFSM, stableStore, logstore, conf.Hasher)
@@ -154,7 +167,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	loc := opts.PeerSet[idx]
 
 	// entry id
-	id := entry.Hash(hlog.conf.Hasher.New())
+	id := entry.Hash(hlog.conf.Hasher())
 	// Verify entry
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
@@ -267,7 +280,7 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	// TODO: verify signature
 	//
 
-	id := entry.Hash(hlog.conf.Hasher.New())
+	id := entry.Hash(hlog.conf.Hasher())
 	// Make sure we have the ballot for the entry id
 	ballot := hlog.getBallot(id)
 	if ballot == nil {

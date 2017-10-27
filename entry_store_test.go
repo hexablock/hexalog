@@ -18,4 +18,12 @@ func TestInMemEntryStore(t *testing.T) {
 	if _, err := entries.Get([]byte("foo")); err != hexatype.ErrEntryNotFound {
 		t.Fatal("should fail with", hexatype.ErrEntryNotFound, err)
 	}
+
+	if err := entries.Delete([]byte("id1")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := entries.Get([]byte("id1")); err != hexatype.ErrEntryNotFound {
+		t.Fatal("should fail with", hexatype.ErrEntryNotFound, err)
+	}
 }

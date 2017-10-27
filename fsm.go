@@ -2,14 +2,9 @@ package hexalog
 
 import (
 	"bytes"
-	"errors"
+	"hash"
 
-	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
-)
-
-var (
-	errTimedOut = errors.New("timed out")
 )
 
 // FSM is the application finite-state-machine.  This is implemented by the application
@@ -54,12 +49,12 @@ type fsm struct {
 	// log store contains all accepted entries
 	ls *LogStore
 	// hash function to use
-	hasher hexatype.Hasher
+	hasher func() hash.Hash
 }
 
 // newFsm initializes a new fsm with the given application FSM, stable store and hash
 // function.  It opens the store and starts the applying in a separate go routine.
-func newFsm(f FSM, ss StableStore, logstore *LogStore, hasher hexatype.Hasher) (*fsm, error) {
+func newFsm(f FSM, ss StableStore, logstore *LogStore, hasher func() hash.Hash) (*fsm, error) {
 	fsm := &fsm{
 		f:       f,
 		applyCh: make(chan *FutureEntry, 16),

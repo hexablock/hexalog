@@ -1,9 +1,9 @@
 package hexalog
 
 import (
+	"hash"
 	"time"
 
-	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -46,15 +46,17 @@ type LogStore struct {
 	// Entry datastore interface
 	entries EntryStore
 	// Hash function to use when calculating id's
-	hasher hexatype.Hasher
+	hasher   func() hash.Hash
+	hashSize int
 }
 
 // NewLogStore initializes a new in-memory log store
-func NewLogStore(entries EntryStore, index IndexStore, hasher hexatype.Hasher) *LogStore {
+func NewLogStore(entries EntryStore, index IndexStore, hasher func() hash.Hash) *LogStore {
 	ls := &LogStore{
-		hasher:  hasher,
-		entries: entries,
-		index:   index,
+		hasher:   hasher,
+		entries:  entries,
+		index:    index,
+		hashSize: hasher().Size(),
 	}
 	log.Printf("[INFO] Hexalog store type='entry' name='%s'", entries.Name())
 	log.Printf("[INFO] Hexalog store type='index' name='%s'", index.Name())
@@ -137,7 +139,7 @@ func (hlog *LogStore) NewEntry(key []byte) *Entry {
 	}
 	// First entry
 	if prev == nil {
-		prev = make([]byte, hlog.hasher.Size())
+		prev = make([]byte, hlog.hashSize)
 		height = 1
 	}
 

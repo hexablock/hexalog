@@ -66,21 +66,22 @@ func (trans *NetTransport) NewEntry(host string, key []byte, opts *RequestOption
 }
 
 // ProposeEntry makes a Propose request on a remote host
-func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error {
+func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) (*ReqResp, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req := &ReqResp{Entry: entry, Options: opts}
-	_, err = conn.client.ProposeRPC(ctx, req)
+
+	resp, err := conn.client.ProposeRPC(ctx, req)
 	trans.returnConn(conn)
 
 	if err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
 
-	return err
+	return resp, err
 }
 
 // CommitEntry makes a Commit request on a remote host
@@ -209,6 +210,7 @@ func (trans *NetTransport) Register(hlog *Hexalog) {
 // ProposeRPC serves a Propose request.  The underlying ballot from the local log is ignored
 func (trans *NetTransport) ProposeRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
 	resp := &ReqResp{}
+
 	ballot, err := trans.hlog.Propose(req.Entry, req.Options)
 	if err != nil {
 		return resp, err
@@ -222,11 +224,12 @@ func (trans *NetTransport) ProposeRPC(ctx context.Context, req *ReqResp) (*ReqRe
 	if err = ballot.Wait(); err != nil {
 		return resp, err
 	}
+	resp.BallotTime = ballot.Runtime().Nanoseconds()
 
 	if opt.WaitApply {
-
 		fut := ballot.Future()
 		_, err = fut.Wait(time.Duration(opt.WaitApplyTimeout) * time.Millisecond)
+		resp.ApplyTime = fut.Runtime().Nanoseconds()
 	}
 
 	return resp, err
@@ -285,7 +288,7 @@ func (trans *NetTransport) FetchKeylog(host string, entry *Entry, opts *RequestO
 	// previous hash is not nil.  Remote assumes all log entries if the request id is nil.
 	req := &ReqResp{Entry: entry}
 	if entry.Previous != nil {
-		req.ID = entry.Hash(trans.hlog.conf.Hasher.New())
+		req.ID = entry.Hash(trans.hlog.conf.Hasher())
 	}
 
 	log.Printf("[DEBUG] Fetching host=%s key=%s height=%d prev=%x", host, entry.Key, entry.Height, entry.Previous)
@@ -404,7 +407,7 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *Request
 	// Get the seek position based on last entry sent from remote
 	var seek []byte
 	if preamble.Entry != nil {
-		seek = preamble.Entry.Hash(trans.hlog.conf.Hasher.New())
+		seek = preamble.Entry.Hash(trans.hlog.conf.Hasher())
 	}
 	// Iterate based on seek position
 	err = keylog.Iter(seek, func(id []byte, entry *Entry) error {

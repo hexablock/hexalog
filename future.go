@@ -3,7 +3,12 @@ package hexalog
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"time"
+)
+
+var (
+	errTimedOut = errors.New("timed out")
 )
 
 // FutureEntry is an entry that been committed to the stable store but has not yet been

@@ -3,6 +3,7 @@ package hexalog
 import (
 	"bytes"
 	"errors"
+	"hash"
 
 	"github.com/hexablock/hexatype"
 )
@@ -19,12 +20,12 @@ type Keylog struct {
 	// KeylogIndex interface
 	idx KeylogIndex
 	// Hash function
-	hasher hexatype.Hasher
+	hasher func() hash.Hash
 }
 
 // NewKeylog initializes a new log for a key. It takes a key, location id and hash function used
 // to compute hash id's of log entries.
-func NewKeylog(entries EntryStore, idx KeylogIndex, hasher hexatype.Hasher) *Keylog {
+func NewKeylog(entries EntryStore, idx KeylogIndex, hasher func() hash.Hash) *Keylog {
 	return &Keylog{
 		hasher:  hasher,
 		entries: entries,
@@ -48,7 +49,7 @@ func (keylog *Keylog) LastEntry() *Entry {
 // AppendEntry appends an entry to the log.  It returns an error if there is a previous
 // hash mismatch
 func (keylog *Keylog) AppendEntry(entry *Entry) (err error) {
-	id := entry.Hash(keylog.hasher.New())
+	id := entry.Hash(keylog.hasher())
 
 	if err = keylog.entries.Set(id, entry); err != nil {
 		return
@@ -72,7 +73,7 @@ func (keylog *Keylog) GetEntry(id []byte) (*Entry, error) {
 // occurred
 func (keylog *Keylog) RollbackEntry(entry *Entry) (int, error) {
 	// Compute hash id outside of lock
-	id := entry.Hash(keylog.hasher.New())
+	id := entry.Hash(keylog.hasher())
 
 	lid := keylog.idx.Last()
 	if lid == nil {

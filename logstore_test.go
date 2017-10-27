@@ -2,12 +2,12 @@ package hexalog
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"fmt"
+	"hash"
 	"log"
 	"testing"
 	"time"
-
-	"github.com/hexablock/hexatype"
 )
 
 func newEntry(ls *LogStore, key string) error {
@@ -20,7 +20,7 @@ func newEntry(ls *LogStore, key string) error {
 func TestLogStore(t *testing.T) {
 	es := NewInMemEntryStore()
 	is := NewInMemIndexStore()
-	ls := NewLogStore(es, is, &hexatype.SHA1Hasher{})
+	ls := NewLogStore(es, is, func() hash.Hash { return sha1.New() })
 
 	kl, err := ls.NewKey([]byte("key"))
 	if err != nil {
@@ -63,9 +63,18 @@ func TestLogStore(t *testing.T) {
 }
 
 func Test_logStore_integration(t *testing.T) {
-	s1 := initTestServer("127.0.0.1:53211")
-	s2 := initTestServer("127.0.0.1:53212")
-	s3 := initTestServer("127.0.0.1:53213")
+	s1, err := initTestServer("127.0.0.1:53211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := initTestServer("127.0.0.1:53212")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := initTestServer("127.0.0.1:53213")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	e1 := s1.hlog.New([]byte("key"))
 
@@ -81,18 +90,18 @@ func Test_logStore_integration(t *testing.T) {
 	st2 := s2.hlog.store
 	st3 := s3.hlog.store
 
-	e1hash := e1.Hash(s1.hlog.conf.Hasher.New())
+	e1hash := e1.Hash(s1.hlog.conf.Hasher())
 
 	<-time.After(100 * time.Millisecond)
 	if _, err = st1.GetEntry(e1.Key, e1hash); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = st3.GetEntry(e1.Key, e1.Hash(s3.hlog.conf.Hasher.New())); err != nil {
+	if _, err = st3.GetEntry(e1.Key, e1.Hash(s3.hlog.conf.Hasher())); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = st2.GetEntry(e1.Key, e1.Hash(s2.hlog.conf.Hasher.New())); err != nil {
+	if _, err = st2.GetEntry(e1.Key, e1.Hash(s2.hlog.conf.Hasher())); err != nil {
 		t.Fatal(err)
 	}
 

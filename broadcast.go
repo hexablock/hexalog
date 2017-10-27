@@ -11,12 +11,12 @@ import (
 
 // sendProposal makes a single proposal request to a location.  if a hexatype.ErrPreviousHash
 // error is returned a  heal request is submitted
-func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Participant, idx int, opts *RequestOptions) error {
+func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Participant, idx int, opts *RequestOptions) (*ReqResp, error) {
 	host := loc.Host
 	o := opts.CloneWithSourceIndex(int32(idx))
 
 	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
-	err := hlog.trans.ProposeEntry(ctx, host, entry, o)
+	resp, err := hlog.trans.ProposeEntry(ctx, host, entry, o)
 
 	switch err {
 
@@ -30,19 +30,22 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Partic
 
 	}
 
-	return err
+	return resp, err
 }
 
 // broadcastPropose broadcasts proposal entries to all members in the peer set
-func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error {
+func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) ([]*ReqResp, error) {
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
-		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+		return nil, fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
 	}
 
 	l := len(opts.PeerSet) - 1
-	resp := make(chan error, l)
+
+	resp := make(chan *ReqResp, l)
+	errCh := make(chan error, l)
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	for j, p := range opts.PeerSet {
@@ -52,20 +55,34 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) error 
 		}
 
 		go func(ent *Entry, loc *Participant, i int, o *RequestOptions) {
-			resp <- hlog.sendProposal(ctx, ent, loc, i, o)
+			rsp, err := hlog.sendProposal(ctx, ent, loc, i, o)
+			if err == nil {
+				resp <- rsp
+			} else {
+				errCh <- err
+			}
+			//resp <- err
 		}(entry, p, idx, opts)
 
 	}
 
 	defer cancel()
 
+	out := make([]*ReqResp, 0, l)
+
 	for i := 0; i < l; i++ {
-		if err := <-resp; err != nil {
-			return err
+		select {
+		case err := <-errCh:
+			return out, err
+		case resp := <-resp:
+			out = append(out, resp)
 		}
+		// if err := <-resp; err != nil {
+		// 	return err
+		// }
 	}
 
-	return nil
+	return out, nil
 }
 
 // broadcastProposals starts consuming the proposal broadcast channel to broadcast
@@ -74,9 +91,9 @@ func (hlog *Hexalog) broadcastProposals() {
 
 	for msg := range hlog.pch {
 
-		if err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
+		if _, err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
 
-			id := msg.Entry.Hash(hlog.conf.Hasher.New())
+			id := msg.Entry.Hash(hlog.conf.Hasher())
 			hlog.ballotGetClose(id, err)
 
 		}
@@ -142,7 +159,7 @@ func (hlog *Hexalog) broadcastCommits() {
 		}
 
 		// Close the ballot with the given error
-		id := en.Hash(hlog.conf.Hasher.New())
+		id := en.Hash(hlog.conf.Hasher())
 		hlog.ballotGetClose(id, err)
 		// Rollback the entry.
 		if er := hlog.store.RollbackEntry(en); er != nil {
