@@ -35,8 +35,8 @@ func TestNetTransport(t *testing.T) {
 	if err = ballot.Wait(); err != nil {
 		t.Fatal(err, ballot)
 	}
-
-	if _, err = ballot.fentry.Wait(2 * time.Second); err != nil {
+	fut := ballot.Future()
+	if _, err = fut.Wait(2 * time.Second); err != nil {
 		t.Fatal(err, ballot)
 	}
 

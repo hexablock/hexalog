@@ -7,44 +7,15 @@ import (
 	"github.com/hexablock/log"
 )
 
-// IndexStore implements a datastore for the log indexes.  It contains all keys on a node
-// with their associated keylog.  The interface must be thread-safe
-type IndexStore interface {
-	// Name of the store
-	Name() string
-	// Create a new KeylogIndex and add it to the store.
-	NewKey(key []byte) (KeylogIndex, error)
-	// Get a KeylogIndex from the store
-	GetKey(key []byte) (KeylogIndex, error)
-	// Create and/or get a KeylogIndex setting the marker if it is created.
-	MarkKey(key []byte, marker []byte) (KeylogIndex, error)
-	// Remove key if exists or return an error
-	RemoveKey(key []byte) error
-	// Iterate over each key
-	Iter(cb func(key []byte, kli KeylogIndex) error) error
-	// Total number of keys in the index
-	Count() int64
-	// Close the index store
-	Close() error
-}
-
-// EntryStore implements a datastore for log entries.
-type EntryStore interface {
-	Name() string // Name of store
-	Get(id []byte) (*Entry, error)
-	Set(id []byte, entry *Entry) error
-	Delete(id []byte) error
-	Count() int64
-	Close() error
-}
-
 // LogStore is the whole log containing all keys.  It manages serialization of
 // operations and all validation and checks required therein.
 type LogStore struct {
 	// KeylogIndex datastore interface
 	index IndexStore
+
 	// Entry datastore interface
 	entries EntryStore
+
 	// Hash function to use when calculating id's
 	hasher   func() hash.Hash
 	hashSize int
@@ -93,8 +64,13 @@ func (hlog *LogStore) RemoveKey(key []byte) error {
 	if err = hlog.index.RemoveKey(key); err == nil {
 		err = keylog.Iter(nil, func(id []byte, entry *Entry) error {
 			//
-			// TODO: Schedule removal of all log entries for the key
+			// TODO: Schedule removal rather than doing inline
 			//
+			if er := hlog.entries.Delete(id); er != nil {
+				log.Printf("[ERROR] Failed to remove entry: %v key=%s id=%x",
+					er, key, id)
+			}
+
 			return nil
 		})
 	}

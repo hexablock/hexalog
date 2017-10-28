@@ -243,23 +243,18 @@ func (trans *NetTransport) CommitRPC(ctx context.Context, req *ReqResp) (*ReqRes
 }
 
 // GetRPC serves a Commit request.  The underlying ballot from the local log is ignored
-func (trans *NetTransport) GetRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
-	var (
-		resp = &ReqResp{}
-		err  error
-	)
-
+func (trans *NetTransport) GetRPC(ctx context.Context, req *ReqResp) (resp *ReqResp, err error) {
+	resp = &ReqResp{}
 	resp.Entry, err = trans.hlog.store.GetEntry(req.Entry.Key, req.ID)
-
-	return resp, err
+	return
 }
 
 // LastRPC serves a LastEntry request.  It returns the local last entry for a key.
-func (trans *NetTransport) LastRPC(ctx context.Context, req *ReqResp) (*ReqResp, error) {
-	var resp = &ReqResp{
+func (trans *NetTransport) LastRPC(ctx context.Context, req *ReqResp) (resp *ReqResp, err error) {
+	resp = &ReqResp{
 		Entry: trans.hlog.store.LastEntry(req.Entry.Key),
 	}
-	return resp, nil
+	return
 }
 
 // NewRPC serves a NewEntry request from the local log
@@ -315,10 +310,6 @@ func (trans *NetTransport) FetchKeylog(host string, entry *Entry, opts *RequestO
 
 		// Continue on if already have the entry.  This should be checked against the
 		// index as the entry may exist but not been applied to the index.
-
-		// if _, err = trans.hlog.store.GetEntry(msg.Entry.Key, msg.ID); err == nil {
-		// 	continue
-		// }
 
 		if fentry, err = trans.hlog.append(msg.ID, msg.Entry); err != nil {
 			log.Printf("[ERROR] Fetch key entry key=%s height=%d error='%v'", entry.Key, entry.Height, err)
