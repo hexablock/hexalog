@@ -170,7 +170,8 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 	// entry id
 	id := entry.Hash(hlog.conf.Hasher())
-	// Verify entry
+
+	// Verify proposed entry
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
 		// Check for heal if previous hash mismatch or a degraded key i.e. marked key

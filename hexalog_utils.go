@@ -132,6 +132,8 @@ func (hlog *Hexalog) removeBallot(key []byte) {
 	hlog.mu.Unlock()
 }
 
+// checkOptions checks if sufficient peers have been provided.  On success
+// it witnesses the lamport clock and sets the new lamport time on the options
 func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
 	if opts.PeerSet == nil || len(opts.PeerSet) < hlog.conf.Votes {
 		return hexatype.ErrInsufficientPeers
