@@ -351,8 +351,8 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	}
 	defer keylog.Close()
 
-	// Get the seek position from the request id.  If it is nil assume all log entries need
-	// to be sent
+	// Get the seek position from the request id.  If it is nil assume all log
+	// entries need to be sent
 	var seek []byte
 	if req.ID != nil {
 		seek = req.ID
@@ -367,7 +367,8 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	return err
 }
 
-// TransferKeylog transfers a key directly from the store to the given host
+// TransferKeylog pushes a key log directly from the local store to the remote
+// host
 func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *RequestOptions) error {
 	// Get the keylog
 	keylog, err := trans.hlog.store.GetKey(key)
@@ -382,18 +383,19 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *Request
 		return nil
 	}
 
-	// Get the connection stream
+	// Get the connection
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return err
 	}
+	// Get the stream from the connection
 	stream, err := conn.client.TransferKeylogRPC(context.Background())
 	if err != nil {
 		return err
 	}
 
-	// Send request preamble with the local last entry letting the  remote know what key we
-	// are requesting
+	// Send request preamble with the local last entry letting the remote know
+	// what key we are requesting
 	preamble := &ReqResp{Entry: last}
 	if err = stream.Send(preamble); err != nil {
 		return err

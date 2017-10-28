@@ -111,7 +111,7 @@ func (fsm *fsm) start() {
 
 }
 
-// check checks entries in the logstore against what is committed to the stable store and
+// check checks the logstore against what is committed to the stable store and
 // submits entries to be applied to the fsm where it left off
 func (fsm *fsm) check() error {
 	var (

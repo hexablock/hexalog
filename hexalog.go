@@ -24,6 +24,7 @@ type Stats struct {
 
 // Transport implements a Hexalog network transport
 type Transport interface {
+	// New entry from the remote host
 	NewEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
 	// Gets an entry from a remote host
 	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
@@ -31,9 +32,11 @@ type Transport interface {
 	LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
 	// Proposes an entry on the remote host
 	ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) (*ReqResp, error)
-	// Commits an entry on the remote host.  This is not directly called by the user
+	// Commits an entry on the remote host.  This is not directly called by the
+	// user
 	CommitEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error
-	// Transfers a complete key log to the remote host
+	// Transfers a complete key log to the remote host based on what the remote
+	// has
 	TransferKeylog(host string, key []byte, opts *RequestOptions) error
 	// Gets all entries from the remote host for a key starting at entry
 	FetchKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error)
@@ -43,8 +46,8 @@ type Transport interface {
 	Shutdown()
 }
 
-// Hexalog is the core log that is responsible for consensus, election, serialization and
-// all other aspects pertaining to consistency
+// Hexalog is the core log that is responsible for consensus, voting, election,
+// serialization and all other aspects pertaining to the log consistency
 type Hexalog struct {
 	conf *Config
 
@@ -57,8 +60,8 @@ type Hexalog struct {
 	// Underlying transport
 	trans Transport
 
-	// The store containing log entires that are committed, but not necessary applied
-	// to the FSM
+	// The store containing log entires that are committed, but not necessary
+	// applied to the FSM
 	store *LogStore
 
 	// Currently active ballots
@@ -71,16 +74,16 @@ type Hexalog struct {
 	// Commit broadcast channel to broadcast commits to the network peer set
 	cch chan *ReqResp
 
-	// Channel for heal requests.  When previous hash mismatches occur, the log will send
-	// a request down this channel to allow applications to try to recover. This is
-	// usually the case when a keylog falls behind.
+	// Channel for heal requests.  When previous hash mismatches occur, the log
+	// will send a request down this channel to allow applications to try to
+	// recover. This is usually the case when a keylog falls behind.
 	hch chan *ReqResp
 
 	// Gets set when once a shutdown is signalled
 	shutdown int32
 
-	// This is initialized with a static size of 3 as we launch 3 go-routines.  The heal
-	// queue is not part of this number
+	// This is initialized with a static size of 3 as we launch 3 go-routines.
+	// The heal queue is not part of this number
 	shutdownCh chan struct{}
 }
 
@@ -111,8 +114,8 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		shutdownCh: make(chan struct{}, 4),
 	}
 
-	// Check to make sure the fsm has all the entries in the log applied.  If not then
-	// submit the remaining entries to be applied to the fsm.
+	// Check to make sure the fsm has all the entries in the log applied.  If
+	// not then submit the remaining entries to be applied to the fsm.
 	if err = hlog.fsm.check(); err != nil {
 		return nil, err
 	}
@@ -153,8 +156,9 @@ func (hlog *Hexalog) New(key []byte) *Entry {
 	return entry
 }
 
-// Propose proposes an entry to the log.  It votes on a ballot if it exists or creates one
-// then votes. If required votes has been reach it also moves to the commit phase.
+// Propose proposes an entry to the log.  It votes on a ballot if it exists or
+// creates one then votes. If required votes has been reach it also moves to the
+// commit phase.
 func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error) {
 	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
@@ -174,10 +178,11 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	// Verify proposed entry
 	prevHeight, err := hlog.verifyEntry(entry)
 	if err != nil {
-		// Check for heal if previous hash mismatch or a degraded key i.e. marked key
+		// Check for heal if previous hash mismatch or a degraded key i.e.
+		// marked key
 		if err == hexatype.ErrPreviousHash || err == hexatype.ErrKeyDegraded {
-			// Try to heal if the new height is > then the current one.  This prevents
-			// an infinite retry. If the height <= we do nothing
+			// Try to heal if the new height is > then the current one.  This
+			// prevents an infinite retry. If the height <= we do nothing
 			if entry.Height > prevHeight {
 				// Submit heal request
 				hlog.hch <- &ReqResp{
@@ -207,15 +212,15 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		hlog.ballots[key] = ballot
 		hlog.mu.Unlock()
 
-		// Cast a vote for ourself if we are not the SourceIndex, on top of casting the remote
-		// vote taking place below
+		// Cast a vote for ourself if we are not the SourceIndex, on top of
+		// casting the remote vote taking place below
 		if idx != int(opts.SourceIndex) {
 			if _, err = ballot.votePropose(id, loc.Host); err != nil {
 				return nil, err
 			}
 
-			// Create a new key if height is zero. We ignore the error as it may already
-			// have been created
+			// Create a new key if height is zero. We ignore the error as it may
+			// already have been created
 			if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, opts); err != nil {
 				ballot.close(err)
 				return nil, err
@@ -300,8 +305,8 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
 		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
-	// We do not rollback here as we could have a faulty voter trying to commit without
-	// having a proposal.
+	// We do not rollback here as we could have a faulty voter trying to commit
+	// without having a proposal.
 	if err != nil {
 		return ballot, err
 	}
