@@ -10,6 +10,53 @@ import (
 	"github.com/hexablock/log"
 )
 
+// check if our last matches the other last.  if not pull from the given host
+func (hlog *Hexalog) checkLastEntryOrPull(host string, key []byte, otherLast []byte) error {
+	var (
+		h = hlog.conf.Hasher()
+		// local last entry
+		last *Entry
+		// local last id
+		lid []byte
+	)
+
+	// Get local keylog
+	keylog, err := hlog.store.GetKey(key)
+	if err != nil {
+		// Create new key
+		if err == hexatype.ErrKeyNotFound {
+			if keylog, err = hlog.store.NewKey(key); err != nil {
+				return err
+			}
+			defer keylog.Close()
+
+			last = &Entry{Key: key}
+			lid = make([]byte, h.Size())
+		} else {
+			return err
+		}
+
+	} else {
+		defer keylog.Close()
+
+		if last = keylog.LastEntry(); last == nil {
+			last = &Entry{Key: key}
+			lid = make([]byte, h.Size())
+		} else {
+			lid = last.Hash(h)
+		}
+
+	}
+
+	// Fetch if there is a mismatch.
+	if bytes.Compare(lid, otherLast) != 0 {
+		_, er := hlog.trans.PullKeylog(host, last, nil)
+		err = mergeErrors(err, er)
+	}
+
+	return err
+}
+
 // append appends the entry to the log.  If it succeeds is submits the entry to be applied
 // to the FSM otherwise returns an error.  This call bypasses the voting process and tries
 // to append to the log directly.  This is only to be used during rebalancing and healing.

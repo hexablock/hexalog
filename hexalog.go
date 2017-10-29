@@ -2,6 +2,7 @@ package hexalog
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 
@@ -30,18 +31,27 @@ type Transport interface {
 	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
 	// Get last entry for the key
 	LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
+
 	// Proposes an entry on the remote host
 	ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) (*ReqResp, error)
+
 	// Commits an entry on the remote host.  This is not directly called by the
 	// user
 	CommitEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error
-	// Transfers a complete key log to the remote host based on what the remote
+
+	// Sends a complete key log to the remote host based on what the remote
 	// has
-	TransferKeylog(host string, key []byte, opts *RequestOptions) error
+	PushKeylog(host string, key []byte, opts *RequestOptions) error
+
 	// Gets all entries from the remote host for a key starting at entry
-	FetchKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error)
-	// Registers the log when available
+	PullKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error)
+
+	// Returns a stream of keys used to seed a new or partial log
+	GetSeedKeys(host string) (*KeySeedStream, error)
+
+	// Makes the log available to the transport
 	Register(hlog *Hexalog)
+
 	// Shutdown the transport closing outbound connections
 	Shutdown()
 }
@@ -87,7 +97,9 @@ type Hexalog struct {
 	shutdownCh chan struct{}
 }
 
-// NewHexalog initializes a new Hexalog and starts the entry broadcaster
+// NewHexalog initializes a new Hexalog and starts the entry broadcaster.  This
+// call will block until fsm checks are performed. ie. the log is caught up based
+// on the stable store
 func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore StableStore,
 	trans Transport) (*Hexalog, error) {
 
@@ -129,6 +141,7 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 func (hlog *Hexalog) start() {
 	// Increment LamportClock on start
 	hlog.ltime.Increment()
+
 	// Register Hexalog to the transport to handle RPC requests
 	hlog.trans.Register(hlog)
 
@@ -319,13 +332,62 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 // Heal submits a heal request for the given key.  It returns an error if the
 // options are invalid.
 func (hlog *Hexalog) Heal(key []byte, opts *RequestOptions) error {
-	if err := hlog.checkOptions(opts); err != nil {
+	err := hlog.checkOptions(opts)
+	if err == nil {
+		ent := &Entry{Key: key}
+		hlog.hch <- &ReqResp{Options: opts, Entry: ent}
+	}
+
+	return err
+}
+
+// Seed gets seed keys from host and starts seeding the local log.  bufsize
+// is the seed buffer size, parallel is the number of parallel keys to seed.
+func (hlog *Hexalog) Seed(existing string, bufsize, parallel int) error {
+	stream, err := hlog.trans.GetSeedKeys(existing)
+	if err != nil {
 		return err
 	}
 
-	ent := &Entry{Key: key}
-	hlog.hch <- &ReqResp{Options: opts, Entry: ent}
+	if parallel < 1 {
+		parallel = 1
+	}
 
+	seeds := make(chan *KeySeed, bufsize)
+	var wg sync.WaitGroup
+	wg.Add(parallel)
+
+	for i := 0; i < parallel; i++ {
+
+		go func(hlog *Hexalog, remote string) {
+			for seed := range seeds {
+				if er := hlog.checkLastEntryOrPull(remote, seed.Key, seed.Marker); er != nil {
+					log.Println("[ERROR]", er)
+				}
+			}
+			wg.Done()
+		}(hlog, existing)
+
+	}
+
+	var seed *KeySeed
+	for {
+		if seed, err = stream.Recv(); err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			break
+		}
+		seeds <- seed
+	}
+
+	close(seeds)
+
+	if err != nil {
+		return err
+	}
+
+	wg.Wait()
 	return nil
 }
 

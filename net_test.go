@@ -2,6 +2,7 @@ package hexalog
 
 import (
 	"bytes"
+	"io"
 	"testing"
 	"time"
 
@@ -60,17 +61,15 @@ func TestNetTransport(t *testing.T) {
 
 	opts := &RequestOptions{}
 
-	if err = s1.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("testkey"), opts); err != nil {
+	if err = s1.hlog.trans.PushKeylog("127.0.0.1:43213", []byte("testkey"), opts); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = s1.hlog.trans.FetchKeylog("127.0.0.1:43213", entry, opts); err != nil {
+	if _, err = s1.hlog.trans.PullKeylog("127.0.0.1:43213", entry, opts); err != nil {
 		t.Fatal(err)
 	}
 
 	<-time.After(100 * time.Millisecond)
-
-	//s4.hlog.trans.FetchKeylog("127.0.0.1:43212", entry)
 
 	l2, err := s2.hlog.trans.LastEntry("127.0.0.1:43213", []byte("testkey"), &RequestOptions{})
 	if err != nil {
@@ -88,11 +87,70 @@ func TestNetTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = s2.hlog.trans.TransferKeylog("127.0.0.1:43213", []byte("does-not-exist"), opts); err != hexatype.ErrKeyNotFound {
+	if err = s2.hlog.trans.PushKeylog("127.0.0.1:43213", []byte("does-not-exist"), opts); err != hexatype.ErrKeyNotFound {
 		t.Fatal("should fail with", hexatype.ErrKeyNotFound, err)
+	}
+
+	tk, _ := s1.hlog.store.GetKey([]byte("testkey"))
+	idx := tk.GetIndex()
+	if idx.LTime == 0 {
+		t.Error("ltime is 0")
+	}
+
+	seeds, err := s2.hlog.trans.GetSeedKeys("127.0.0.1:43213")
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	var seed *KeySeed
+	var c int
+	for {
+		seed, err = seeds.Recv()
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			break
+		}
+		t.Log(seed)
+		c++
+	}
+	seeds.Recycle()
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if c == 0 {
+		t.Fatal("have 0 seeds")
+	}
+
+	testOpts.WaitApply = true
+	testOpts.WaitBallot = true
+	n := s3.hlog.New([]byte("foobar"))
+	s3.hlog.Propose(n, testOpts)
+	n = s3.hlog.New([]byte("foobar1"))
+	s3.hlog.Propose(n, testOpts)
+	n = s3.hlog.New([]byte("foobar2"))
+	s3.hlog.Propose(n, testOpts)
+
+	s4, err := initTestServer("127.0.0.1:43214")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = s4.hlog.Seed("127.0.0.1:43211", 16, 3); err != nil {
+		t.Error(err)
+	}
+
+	if err = s4.hlog.heal([]byte("foobar1"), testOpts.PeerSet); err != nil {
+		t.Error(err)
+	}
+	if err = s4.hlog.Heal([]byte("foobar2"), testOpts); err != nil {
+		t.Error(err)
 	}
 
 	s1.stop()
 	s2.stop()
 	s3.stop()
+	s4.stop()
 }

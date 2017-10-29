@@ -37,10 +37,11 @@ func NewLogStore(entries EntryStore, index IndexStore, hasher func() hash.Hash) 
 // NewKey creates a new keylog for a key.  It returns an error if the key already exists
 func (hlog *LogStore) NewKey(key []byte) (keylog *Keylog, err error) {
 	idx, err := hlog.index.NewKey(key)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return NewKeylog(hlog.entries, idx, hlog.hasher), nil
 	}
-	return NewKeylog(hlog.entries, idx, hlog.hasher), nil
+
+	return nil, err
 }
 
 // GetKey returns the log for the given key
@@ -145,6 +146,28 @@ func (hlog *LogStore) RollbackEntry(entry *Entry) error {
 	}
 
 	// Return rollback error
+	return err
+}
+
+// IterKeySeed iterates of KeySeed objects
+func (hlog *LogStore) IterKeySeed(f func(*KeySeed) error) error {
+	err := hlog.index.Iter(func(key []byte, kli KeylogIndex) error {
+		idx := kli.Index()
+
+		marker := idx.Marker
+		if marker == nil {
+			marker = idx.Last()
+		}
+
+		seed := &KeySeed{
+			Key:    key,
+			Marker: marker,
+			Height: kli.Height(),
+			LTime:  idx.LTime,
+		}
+
+		return f(seed)
+	})
 	return err
 }
 

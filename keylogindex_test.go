@@ -6,10 +6,10 @@ func Test_SafeKeylogIndex(t *testing.T) {
 	//ukli := NewUnsafeKeylogIndex([]byte("key"))
 	ukli := NewSafeKeylogIndex([]byte("key"), nil)
 
-	if err := ukli.Append([]byte("foo"), make([]byte, 32)); err != nil {
+	if err := ukli.Append([]byte("foo"), make([]byte, 32), 1); err != nil {
 		t.Fatal(err)
 	}
-	if err := ukli.Append([]byte("bar"), []byte("foo")); err != nil {
+	if err := ukli.Append([]byte("bar"), []byte("foo"), 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -19,7 +19,7 @@ func Test_SafeKeylogIndex(t *testing.T) {
 	if ok, _ := ukli.SetMarker([]byte("bar")); ok {
 		t.Fatal("should fail to set marker")
 	}
-	c, ok := ukli.Rollback()
+	c, ok := ukli.Rollback(1)
 	if !ok {
 		t.Fatal("rollback failed")
 	}
@@ -37,5 +37,8 @@ func Test_SafeKeylogIndex(t *testing.T) {
 	}
 	if _, err := idx.MarshalJSON(); err != nil {
 		t.Fatal(err)
+	}
+	if idx.LTime != 1 {
+		t.Fatalf("ltime want=2 have=%d", idx.LTime)
 	}
 }

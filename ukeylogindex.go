@@ -18,7 +18,7 @@ func NewUnsafeKeylogIndex(key []byte) *UnsafeKeylogIndex {
 
 // Append appends the id to the index making sure prev matches the id of the current
 // last entry.  If this is the first entry, prev should be a zero hash.
-func (idx *UnsafeKeylogIndex) Append(id, prev []byte) error {
+func (idx *UnsafeKeylogIndex) Append(id, prev []byte, ltime uint64) error {
 	last := idx.Last()
 	if last == nil {
 		if !isZeroBytes(prev) {
@@ -30,7 +30,7 @@ func (idx *UnsafeKeylogIndex) Append(id, prev []byte) error {
 
 	idx.Entries = append(idx.Entries, id)
 	idx.Height++
-
+	idx.LTime = ltime
 	// Check marker to see if it needs to be removed. The marker is removed once that entry
 	// has been added to the index
 	if idx.Marker != nil {
@@ -72,7 +72,7 @@ func (idx *UnsafeKeylogIndex) Last() []byte {
 
 // Rollback removes the last entry from the index. It returns the remaining entries and
 // whether a rollback was performed
-func (idx *UnsafeKeylogIndex) Rollback() (int, bool) {
+func (idx *UnsafeKeylogIndex) Rollback(ltime uint64) (int, bool) {
 	l := len(idx.Entries)
 	var ok bool
 	if l > 0 {
@@ -80,6 +80,10 @@ func (idx *UnsafeKeylogIndex) Rollback() (int, bool) {
 		idx.Entries = idx.Entries[:l]
 		ok = true
 		idx.Height--
+		// Only update the ltime if it is less than the current one
+		if ltime > 0 && ltime < idx.LTime {
+			idx.LTime = ltime
+		}
 	}
 
 	return l, ok
@@ -129,11 +133,13 @@ func (idx UnsafeKeylogIndex) MarshalJSON() ([]byte, error) {
 		Key     string
 		Height  uint32
 		Marker  string `json:",omitempty"`
+		LTime   uint64
 		Entries []string
 	}{
 		Key:     string(idx.Key),
 		Height:  idx.Height,
 		Marker:  hex.EncodeToString(idx.Marker),
+		LTime:   idx.LTime,
 		Entries: make([]string, len(idx.Entries)),
 	}
 

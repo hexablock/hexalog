@@ -8,8 +8,12 @@ service HexalogRPC {
     rpc NewRPC(ReqResp) returns (ReqResp) {}
     rpc GetRPC(ReqResp) returns (ReqResp) {}
     rpc LastRPC(ReqResp) returns (ReqResp) {}
-    rpc TransferKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
-    rpc FetchKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
+    // Push a keylog from a given seek position
+    rpc PushKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
+    // Pull a keylog
+    rpc PullKeylogRPC(stream ReqResp) returns (stream ReqResp) {}
+    // Seed keys to build the log
+    rpc SeedKeysRPC(ReqResp) returns (stream KeySeed) {}
 }
 
 // Hexalog entry
@@ -35,6 +39,13 @@ message UnsafeKeylogIndex {
     uint64 LTime = 4;
     // Entry ids
     repeated bytes Entries = 5;
+}
+
+message KeySeed {
+    bytes Key = 1;
+    uint32 Height = 2;
+    bytes Marker = 3;
+    uint64 LTime = 4;
 }
 
 // Request and response shared structure for hexalog

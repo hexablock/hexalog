@@ -12,10 +12,15 @@ type KeylogIndex interface {
 	SetMarker(id []byte) (bool, error)
 	// returns the marker
 	Marker() []byte
-	// Append id checking previous is equal to prev
-	Append(id, prev []byte) error
-	// Remove last entr
-	Rollback() (int, bool)
+
+	// Append id checking previous is equal to prev.  Ltime is lamport time
+	// attached to the entry
+	Append(id, prev []byte, ltime uint64) error
+
+	// Remove last entry and set the ltime.  The ltime here should be that of
+	// the previous entry
+	Rollback(ltime uint64) (int, bool)
+
 	// Last entry id
 	Last() []byte
 	// Contains the entry id or not
@@ -70,18 +75,18 @@ func (idx *SafeKeylogIndex) SetMarker(marker []byte) (bool, error) {
 }
 
 // Append appends the id to the index checking the previous hash.
-func (idx *SafeKeylogIndex) Append(id, prev []byte) error {
+func (idx *SafeKeylogIndex) Append(id, prev []byte, ltime uint64) error {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 
-	return idx.idx.Append(id, prev)
+	return idx.idx.Append(id, prev, ltime)
 }
 
 // Rollback safely removes the last entry id
-func (idx *SafeKeylogIndex) Rollback() (int, bool) {
+func (idx *SafeKeylogIndex) Rollback(ltime uint64) (int, bool) {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
-	return idx.idx.Rollback()
+	return idx.idx.Rollback(ltime)
 }
 
 // Last safely returns the last entry id

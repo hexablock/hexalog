@@ -58,7 +58,7 @@ func (keylog *Keylog) AppendEntry(entry *Entry) (err error) {
 	// Add id to index.  The index will check for order based on the supplied previous.  We
 	// do not rollback the above entry from the entry store on error as only entries in the
 	// index matter.
-	err = keylog.idx.Append(id, entry.Previous)
+	err = keylog.idx.Append(id, entry.Previous, entry.LTime)
 
 	return
 }
@@ -90,8 +90,13 @@ func (keylog *Keylog) RollbackEntry(entry *Entry) (int, error) {
 		return keylog.idx.Count(), err
 	}
 
+	var ltime uint64
+	last, err := keylog.entries.Get(entry.Previous)
+	if err == nil {
+		ltime = last.LTime
+	}
 	// Remove id from index
-	n, _ := keylog.idx.Rollback()
+	n, _ := keylog.idx.Rollback(ltime)
 	return n, nil
 }
 

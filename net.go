@@ -1,64 +1,55 @@
 package hexalog
 
 import (
-	"fmt"
 	"io"
 
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
-type rpcOutConn struct {
-	host   string
-	conn   *grpc.ClientConn
-	client HexalogRPCClient
-	used   time.Time
+type KeySeedStream struct {
+	o    *rpcOutConn
+	pool *outPool
+	HexalogRPC_SeedKeysRPCClient
+}
+
+// Recycle recycles the stream returning the conn back to the pool
+func (stream *KeySeedStream) Recycle() {
+	stream.pool.returnConn(stream.o)
 }
 
 // NetTransport is the network transport interface used to make remote calls.
 type NetTransport struct {
 	hlog *Hexalog
-
-	mu   sync.RWMutex
-	pool map[string]*rpcOutConn
-
-	maxConnIdle  time.Duration
-	reapInterval time.Duration
-
-	shutdown int32
+	pool *outPool
 }
 
 // NewNetTransport initializes a NetTransport with an outbound connection pool.
 func NewNetTransport(reapInterval, maxConnIdle time.Duration) *NetTransport {
 	trans := &NetTransport{
-		pool:         make(map[string]*rpcOutConn),
-		maxConnIdle:  maxConnIdle,
-		reapInterval: reapInterval,
+		pool: newOutPool(maxConnIdle, reapInterval),
 	}
 
-	go trans.reapOld()
+	go trans.pool.reapOld()
 
 	return trans
 }
 
 // NewEntry requests a new Entry for a given key from the remote host.
 func (trans *NetTransport) NewEntry(host string, key []byte, opts *RequestOptions) (*Entry, error) {
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
 	req := &ReqResp{Entry: &Entry{Key: key}, Options: opts}
 	resp, err := conn.client.NewRPC(context.Background(), req)
+	trans.pool.returnConn(conn)
 	if err != nil {
-		trans.returnConn(conn)
 		return nil, hexatype.ParseGRPCError(err)
 	}
 
@@ -67,15 +58,14 @@ func (trans *NetTransport) NewEntry(host string, key []byte, opts *RequestOption
 
 // ProposeEntry makes a Propose request on a remote host
 func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) (*ReqResp, error) {
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
 	req := &ReqResp{Entry: entry, Options: opts}
-
 	resp, err := conn.client.ProposeRPC(ctx, req)
-	trans.returnConn(conn)
+	trans.pool.returnConn(conn)
 
 	if err != nil {
 		err = hexatype.ParseGRPCError(err)
@@ -86,7 +76,7 @@ func (trans *NetTransport) ProposeEntry(ctx context.Context, host string, entry 
 
 // CommitEntry makes a Commit request on a remote host
 func (trans *NetTransport) CommitEntry(ctx context.Context, host string, entry *Entry, opts *RequestOptions) error {
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return err
 	}
@@ -95,21 +85,21 @@ func (trans *NetTransport) CommitEntry(ctx context.Context, host string, entry *
 	if _, err = conn.client.CommitRPC(ctx, req); err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
-	trans.returnConn(conn)
+	trans.pool.returnConn(conn)
 
 	return err
 }
 
 // LastEntry retrieves the last entry for the given key from a remote host.
 func (trans *NetTransport) LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error) {
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
 	req := &ReqResp{Entry: &Entry{Key: key}, Options: opts}
 	resp, err := conn.client.LastRPC(context.Background(), req)
-	trans.returnConn(conn)
+	trans.pool.returnConn(conn)
 
 	if err != nil {
 		return nil, hexatype.ParseGRPCError(err)
@@ -120,14 +110,14 @@ func (trans *NetTransport) LastEntry(host string, key []byte, opts *RequestOptio
 
 // GetEntry makes a Get request to retrieve an Entry from a remote host.
 func (trans *NetTransport) GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error) {
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
 	req := &ReqResp{ID: id, Entry: &Entry{Key: key}, Options: opts}
 	resp, err := conn.client.GetRPC(context.Background(), req)
-	trans.returnConn(conn)
+	trans.pool.returnConn(conn)
 
 	if err != nil {
 		return nil, hexatype.ParseGRPCError(err)
@@ -136,70 +126,27 @@ func (trans *NetTransport) GetEntry(host string, key, id []byte, opts *RequestOp
 	return resp.Entry, nil
 }
 
-func (trans *NetTransport) getConn(host string) (*rpcOutConn, error) {
-	if atomic.LoadInt32(&trans.shutdown) == 1 {
-		return nil, fmt.Errorf("transport is shutdown")
-	}
-
-	trans.mu.RLock()
-	if out, ok := trans.pool[host]; ok && out != nil {
-		defer trans.mu.RUnlock()
-		return out, nil
-	}
-	trans.mu.RUnlock()
-
-	conn, err := grpc.Dial(host, grpc.WithInsecure())
+// GetSeedKeys gets KeySeeds from a host.
+func (trans *NetTransport) GetSeedKeys(host string) (*KeySeedStream, error) {
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	// Make a new connection
-	trans.mu.Lock()
-	out := &rpcOutConn{
-		host:   host,
-		client: NewHexalogRPCClient(conn),
-		conn:   conn,
-		used:   time.Now(),
-	}
-	trans.pool[host] = out
-	trans.mu.Unlock()
-
-	return out, err
-}
-
-func (trans *NetTransport) returnConn(o *rpcOutConn) {
-	if atomic.LoadInt32(&trans.shutdown) == 1 {
-		o.conn.Close()
-		return
+	req := &ReqResp{}
+	stream, err := conn.client.SeedKeysRPC(context.Background(), req)
+	if err != nil {
+		trans.pool.returnConn(conn)
+		return nil, hexatype.ParseGRPCError(err)
 	}
 
-	// Push back into the pool
-	trans.mu.Lock()
-	// Update the last used time
-	o.used = time.Now()
-	trans.pool[o.host] = o
-	trans.mu.Unlock()
-}
-
-func (trans *NetTransport) reapOld() {
-	for {
-		if atomic.LoadInt32(&trans.shutdown) == 1 {
-			return
-		}
-		time.Sleep(trans.reapInterval)
-		trans.reapOnce()
+	kss := &KeySeedStream{
+		o:    conn,
+		pool: trans.pool,
+		HexalogRPC_SeedKeysRPCClient: stream,
 	}
-}
 
-func (trans *NetTransport) reapOnce() {
-	trans.mu.Lock()
-	for host, conns := range trans.pool {
-		if time.Since(conns.used) > trans.maxConnIdle {
-			conns.conn.Close()
-			delete(trans.pool, host)
-		}
-	}
-	trans.mu.Unlock()
+	return kss, nil
 }
 
 // Register registers the log with the transport to serve RPC requests to the log
@@ -264,17 +211,17 @@ func (trans *NetTransport) NewRPC(ctx context.Context, req *ReqResp) (*ReqResp, 
 	}, nil
 }
 
-// FetchKeylog fetches the key log from the given host starting at the entry.  If the
+// PullKeylog fetches the key log from the given host starting at the entry.  If the
 // previous hash of the entry is nil, then all entries for the key are fetched. It appends
 // each entry directly to the log and submits to the FSM and returns a FutureEntry which
 // is the last entry that was appended to the key log and/or an error.  The keylog must
 // exist in order for the log to be sucessfully fetched.
-func (trans *NetTransport) FetchKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error) {
-	conn, err := trans.getConn(host)
+func (trans *NetTransport) PullKeylog(host string, entry *Entry, opts *RequestOptions) (*FutureEntry, error) {
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
-	stream, err := conn.client.FetchKeylogRPC(context.Background())
+	stream, err := conn.client.PullKeylogRPC(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -320,8 +267,8 @@ func (trans *NetTransport) FetchKeylog(host string, entry *Entry, opts *RequestO
 	return fentry, hexatype.ParseGRPCError(err)
 }
 
-// FetchKeylogRPC streams log entries for key to the caller based on the request
-func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer) error {
+// PullKeylogRPC streams log entries for key to the caller based on the request
+func (trans *NetTransport) PullKeylogRPC(stream HexalogRPC_PullKeylogRPCServer) error {
 	// Get request
 	req, err := stream.Recv()
 	if err != nil {
@@ -336,20 +283,20 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	}
 
 	// Get the key log
-	keylog, err := trans.hlog.store.GetKey(req.Entry.Key)
+	keylog, err := trans.hlog.store.GetKey(ent.Key)
 	if err != nil {
 		return err
 	}
 	defer keylog.Close()
 
-	// Get the seek position from the request id.  If it is nil assume all log
-	// entries need to be sent
+	// Get the requested seek position from the request id.  If it is nil assume
+	// all log entries need to be sent
 	var seek []byte
 	if req.ID != nil {
 		seek = req.ID
 	}
 
-	// Start sending entries starting from the id in the request
+	// Start sending entries starting at the id in the request
 	err = keylog.Iter(seek, func(id []byte, entry *Entry) error {
 		resp := &ReqResp{Entry: entry, ID: id}
 		return stream.Send(resp)
@@ -358,9 +305,9 @@ func (trans *NetTransport) FetchKeylogRPC(stream HexalogRPC_FetchKeylogRPCServer
 	return err
 }
 
-// TransferKeylog pushes a key log directly from the local store to the remote
+// PushKeylog pushes a key log directly from the local store to the remote
 // host
-func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *RequestOptions) error {
+func (trans *NetTransport) PushKeylog(host string, key []byte, opts *RequestOptions) error {
 	// Get the keylog
 	keylog, err := trans.hlog.store.GetKey(key)
 	if err != nil {
@@ -375,12 +322,12 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *Request
 	}
 
 	// Get the connection
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return err
 	}
 	// Get the stream from the connection
-	stream, err := conn.client.TransferKeylogRPC(context.Background())
+	stream, err := conn.client.PushKeylogRPC(context.Background())
 	if err != nil {
 		return err
 	}
@@ -402,11 +349,10 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *Request
 	if preamble.Entry != nil {
 		seek = preamble.Entry.Hash(trans.hlog.conf.Hasher())
 	}
-	// Iterate based on seek position
+
+	// Iterate based on seek position and send to remote
 	err = keylog.Iter(seek, func(id []byte, entry *Entry) error {
-		// Send entry
-		req := &ReqResp{ID: id, Entry: entry}
-		if err = stream.Send(req); err != nil {
+		if err = stream.Send(&ReqResp{ID: id, Entry: entry}); err != nil {
 			return err
 		}
 		return nil
@@ -422,11 +368,13 @@ func (trans *NetTransport) TransferKeylog(host string, key []byte, opts *Request
 	return err
 }
 
-// TransferKeylogRPC accepts a transfer request for a key initiated by a remote host.  The
-// key must first be initialized before a transfer is accepted.  It returns an
-// ErrKeyNotFound if the key has not been locally initialized or any underlying error
-func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPCServer) error {
-	// Get request and check it.  The ID in this request is the location id of the key.
+// PushKeylogRPC accepts a transfer request for a key initiated by a remote host.
+// The key must first be initialized before a transfer is accepted.  It returns
+// an ErrKeyNotFound if the key has not been locally initialized or any
+// underlying error
+func (trans *NetTransport) PushKeylogRPC(stream HexalogRPC_PushKeylogRPCServer) error {
+	// Get request and check it.  The ID in this request is the location id of
+	// the key.
 	req, err := stream.Recv()
 	if err != nil {
 		return err
@@ -474,8 +422,8 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 		log.Printf("[DEBUG] Take over id=%x key=%s height=%d prev=%x",
 			msg.ID, msg.Entry.Key, msg.Entry.Height, msg.Entry.Previous)
 
-		// We append to the keylog rather than the log here as we have already gotten the key
-		// and would be more efficient
+		// We append to the keylog rather than the log here as we have already
+		// gotten the key and would be more efficient
 		if er := keylog.AppendEntry(msg.Entry); er != nil {
 			log.Printf("[ERROR] Failed to accept key entry transfer key=%s height=%d error='%v'",
 				msg.Entry.Key, msg.Entry.Height, er)
@@ -490,14 +438,18 @@ func (trans *NetTransport) TransferKeylogRPC(stream HexalogRPC_TransferKeylogRPC
 	return err
 }
 
-// Shutdown signals the transport to be shutdown and closes all outbound connections.
-func (trans *NetTransport) Shutdown() {
-	atomic.StoreInt32(&trans.shutdown, 1)
+// SeedKeysRPC builds KeySeeds using the last entry for a key and streams them
+// to the requestor
+func (trans *NetTransport) SeedKeysRPC(req *ReqResp, stream HexalogRPC_SeedKeysRPCServer) error {
+	err := trans.hlog.store.IterKeySeed(func(seed *KeySeed) error {
+		return stream.Send(seed)
+	})
 
-	trans.mu.Lock()
-	for _, conn := range trans.pool {
-		conn.conn.Close()
-	}
-	trans.pool = nil
-	trans.mu.Unlock()
+	return err
+}
+
+// Shutdown signals the transport to be shutdown and closes all outbound
+// connections.
+func (trans *NetTransport) Shutdown() {
+	trans.pool.shutdown()
 }
