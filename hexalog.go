@@ -359,14 +359,20 @@ func (hlog *Hexalog) Seed(existing string, bufsize, parallel int) error {
 
 	for i := 0; i < parallel; i++ {
 
-		go func(hlog *Hexalog, remote string) {
+		go func(hlog *Hexalog, remote string, idx, total int) {
+			var c int
 			for seed := range seeds {
 				if er := hlog.checkLastEntryOrPull(remote, seed.Key, seed.Marker); er != nil {
 					log.Println("[ERROR]", er)
+					continue
 				}
+
+				c++
 			}
 			wg.Done()
-		}(hlog, existing)
+			log.Printf("[INFO] Seeded set=%d/%d keys=%d remote=%s", idx, total, c, remote)
+
+		}(hlog, existing, i, parallel)
 
 	}
 
