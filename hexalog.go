@@ -61,9 +61,6 @@ type Transport interface {
 type Hexalog struct {
 	conf *Config
 
-	// Lamport clock
-	ltime *hexatype.LamportClock
-
 	// Internal fsm.  This wraps the application FSM from the config
 	fsm *fsm
 
@@ -122,7 +119,6 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 		cch:        make(chan *ReqResp, conf.BroadcastBufSize),
 		hch:        make(chan *ReqResp, conf.HealBufSize),
 		store:      logstore,
-		ltime:      &hexatype.LamportClock{},
 		shutdownCh: make(chan struct{}, 4),
 	}
 
@@ -140,7 +136,7 @@ func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore Stable
 
 func (hlog *Hexalog) start() {
 	// Increment LamportClock on start
-	hlog.ltime.Increment()
+	hlog.conf.LamportClock.Increment()
 
 	// Register Hexalog to the transport to handle RPC requests
 	hlog.trans.Register(hlog)
@@ -165,7 +161,7 @@ func (hlog *Hexalog) Stats() *Stats {
 // New returns a new Entry to be appended to the log for the given key.
 func (hlog *Hexalog) New(key []byte) *Entry {
 	entry := hlog.store.NewEntry(key)
-	entry.LTime = uint64(hlog.ltime.Time())
+	entry.LTime = uint64(hlog.conf.LamportClock.Time())
 	return entry
 }
 

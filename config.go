@@ -4,16 +4,19 @@ import (
 	"crypto/sha1"
 	"hash"
 	"time"
+
+	"github.com/hexablock/hexatype"
 )
 
 // Config holds the configuration for the log.  This is used to initialize the log.
 type Config struct {
 	Hostname           string
-	HealBufSize        int           // Buffer size for heal requests
-	BroadcastBufSize   int           // proposal and commit broadcast buffer
-	BallotReapInterval time.Duration // interval at which old ballots are cleaned up
-	TTL                time.Duration // ttl for each ballot
-	Votes              int           // minimum votes required
+	HealBufSize        int                    // Buffer size for heal requests
+	BroadcastBufSize   int                    // proposal and commit broadcast buffer
+	BallotReapInterval time.Duration          // interval at which old ballots are cleaned up
+	TTL                time.Duration          // ttl for each ballot
+	Votes              int                    // minimum default votes required if not supplied
+	LamportClock       *hexatype.LamportClock // Cluster clock
 	Hasher             func() hash.Hash
 	hashSize           int
 }
@@ -29,6 +32,6 @@ func DefaultConfig(hostname string) *Config {
 		TTL:                3 * time.Second,
 		Votes:              3,        // Minimum votes
 		Hasher:             sha1.New, // hash function
+		LamportClock:       &hexatype.LamportClock{},
 	}
-
 }

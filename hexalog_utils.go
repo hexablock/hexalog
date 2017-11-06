@@ -186,8 +186,8 @@ func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
 		return hexatype.ErrInsufficientPeers
 	}
 
-	hlog.ltime.Witness(hexatype.LamportTime(opts.LTime))
-	opts.LTime = uint64(hlog.ltime.Time())
+	hlog.conf.LamportClock.Witness(hexatype.LamportTime(opts.LTime))
+	opts.LTime = uint64(hlog.conf.LamportClock.Time())
 
 	return nil
 }
@@ -214,7 +214,7 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 	if currVotes == 1 {
 		// Broadcast commit entry
 		hlog.cch <- &ReqResp{Entry: entry, Options: opts}
-		hlog.ltime.Increment()
+		hlog.conf.LamportClock.Increment()
 
 	} else if currVotes == hlog.conf.Votes {
 
@@ -230,7 +230,7 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 		ballot.close(nil)
 		// Ballot is closed.  Remove ballot and stop tracking
 		//hlog.removeBallot(key)
-		hlog.ltime.Increment()
+		hlog.conf.LamportClock.Increment()
 	}
 
 	// Do nothing as it may be a repetative vote
@@ -251,7 +251,7 @@ func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts
 
 	// Broadcast proposal
 	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-	hlog.ltime.Increment()
+	hlog.conf.LamportClock.Increment()
 
 	return nil
 }
