@@ -48,9 +48,9 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) ([]*Re
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	for j, p := range opts.PeerSet {
+	for _, p := range opts.PeerSet {
 		// Skip broadcasting to self
-		if idx == j {
+		if hlog.conf.Hostname == p.Host {
 			continue
 		}
 
@@ -117,9 +117,9 @@ func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 	resp := make(chan error, l)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	for j, p := range opts.PeerSet {
+	for _, p := range opts.PeerSet {
 		// Do not broadcast to self
-		if j == idx {
+		if hlog.conf.Hostname == p.Host {
 			continue
 		}
 
