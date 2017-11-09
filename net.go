@@ -192,7 +192,7 @@ func (trans *NetTransport) CommitRPC(ctx context.Context, req *ReqResp) (*ReqRes
 // GetRPC serves a Commit request.  The underlying ballot from the local log is ignored
 func (trans *NetTransport) GetRPC(ctx context.Context, req *ReqResp) (resp *ReqResp, err error) {
 	resp = &ReqResp{}
-	resp.Entry, err = trans.hlog.store.GetEntry(req.Entry.Key, req.ID)
+	resp.Entry, err = trans.hlog.Get(req.Entry.Key, req.ID)
 	return
 }
 

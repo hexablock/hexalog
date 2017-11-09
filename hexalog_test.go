@@ -134,7 +134,7 @@ func initTestServer(addr string) (*testServer, error) {
 
 	ts.initStorage()
 
-	if ts.hlog, err = NewHexalog(ts.conf, ts.fsm, ts.ls, ts.ss, trans); err == nil {
+	if ts.hlog, err = NewHexalog(ts.conf, ts.fsm, ts.es, ts.is, ts.ss, trans); err == nil {
 		ts.start()
 	}
 

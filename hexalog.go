@@ -27,8 +27,10 @@ type Stats struct {
 type Transport interface {
 	// New entry from the remote host
 	NewEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
+
 	// Gets an entry from a remote host
 	GetEntry(host string, key, id []byte, opts *RequestOptions) (*Entry, error)
+
 	// Get last entry for the key
 	LastEntry(host string, key []byte, opts *RequestOptions) (*Entry, error)
 
@@ -96,11 +98,14 @@ type Hexalog struct {
 
 // NewHexalog initializes a new Hexalog and starts the entry broadcaster.  This
 // call will block until fsm checks are performed. ie. the log is caught up based
-// on the stable store
-func NewHexalog(conf *Config, appFSM FSM, logstore *LogStore, stableStore StableStore,
+// on the stable store.  The transport must be registered to grpc before passing
+// it to hexalog
+func NewHexalog(conf *Config, appFSM FSM, entries EntryStore, index IndexStore, stableStore StableStore,
 	trans Transport) (*Hexalog, error) {
 
 	conf.hashSize = conf.Hasher().Size()
+
+	logstore := NewLogStore(entries, index, conf.Hasher)
 
 	// Init internal FSM that manages the user provided application fsm
 	ifsm, err := newFsm(appFSM, stableStore, logstore, conf.Hasher)
@@ -165,6 +170,11 @@ func (hlog *Hexalog) New(key []byte) *Entry {
 	return entry
 }
 
+// Get returns an entry for a key by the id
+func (hlog *Hexalog) Get(key, id []byte) (*Entry, error) {
+	return hlog.store.GetEntry(key, id)
+}
+
 // Propose proposes an entry to the log.  It votes on a ballot if it exists or
 // creates one then votes. If required votes has been reach it also moves to the
 // commit phase.
@@ -181,7 +191,12 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	}
 	loc := opts.PeerSet[idx]
 
-	// entry id
+	// If the provided SourceIndex is not set then assume it is a  none
+	// participating node
+	if opts.SourceIndex < 0 {
+		opts.SourceIndex = int32(idx)
+	}
+
 	id := entry.Hash(hlog.conf.Hasher())
 
 	// Verify proposed entry
