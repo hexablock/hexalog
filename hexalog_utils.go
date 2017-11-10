@@ -188,7 +188,7 @@ func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
 // getSelfIndex gets the index of this node in the PeerSet
 func (hlog *Hexalog) getSelfIndex(peerset []*Participant) (int, bool) {
 	for i, p := range peerset {
-		if p.Host == hlog.conf.Hostname {
+		if p.Host == hlog.conf.AdvertiseHost {
 			return i, true
 		}
 	}
@@ -217,7 +217,7 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 			return
 		}
 
-		log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.Hostname, entry.Key, entry.Height)
+		log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.AdvertiseHost, entry.Key, entry.Height)
 		// Queue future entry to be applied to the FSM.
 		hlog.fsm.apply(ballot.fentry)
 		// Close the ballot after we've submitted to the fsm

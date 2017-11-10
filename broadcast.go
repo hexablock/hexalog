@@ -14,7 +14,7 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Partic
 	host := loc.Host
 	o := opts.CloneWithSourceIndex(int32(idx))
 
-	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
+	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.AdvertiseHost, host, o.SourceIndex)
 	resp, err := hlog.trans.ProposeEntry(ctx, host, entry, o)
 
 	// switch err {
@@ -37,7 +37,7 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) ([]*Re
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
-		return nil, fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+		return nil, fmt.Errorf("%s not in PeerSet", hlog.conf.AdvertiseHost)
 	}
 
 	l := len(opts.PeerSet) - 1
@@ -49,7 +49,7 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) ([]*Re
 
 	for _, p := range opts.PeerSet {
 		// Skip broadcasting to self
-		if hlog.conf.Hostname == p.Host {
+		if hlog.conf.AdvertiseHost == p.Host {
 			continue
 		}
 
@@ -106,7 +106,7 @@ func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 	// Get self index in the PeerSet.
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
-		return fmt.Errorf("%s not in PeerSet", hlog.conf.Hostname)
+		return fmt.Errorf("%s not in PeerSet", hlog.conf.AdvertiseHost)
 	}
 
 	l := len(opts.PeerSet) - 1
@@ -115,7 +115,7 @@ func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 
 	for _, p := range opts.PeerSet {
 		// Do not broadcast to self
-		if hlog.conf.Hostname == p.Host {
+		if hlog.conf.AdvertiseHost == p.Host {
 			continue
 		}
 
@@ -123,7 +123,7 @@ func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 			o := opt.CloneWithSourceIndex(int32(i))
 			host := loc.Host
 
-			log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
+			log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.AdvertiseHost, host, o.SourceIndex)
 			resp <- hlog.trans.CommitEntry(ctx, host, ent, o)
 
 		}(entry, p, idx, opts)

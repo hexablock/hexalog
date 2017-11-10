@@ -146,6 +146,7 @@ func (hlog *Hexalog) start() {
 	// Register Hexalog to the transport to handle RPC requests
 	hlog.trans.Register(hlog)
 
+	// Start background go-routines
 	go hlog.broadcastProposals()
 	go hlog.broadcastCommits()
 	go hlog.healKeys()
@@ -187,7 +188,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	// Get our location index in the peerset and location
 	idx, ok := hlog.getSelfIndex(opts.PeerSet)
 	if !ok {
-		return nil, fmt.Errorf("%s not in peer set", hlog.conf.Hostname)
+		return nil, fmt.Errorf("%s not in peer set", hlog.conf.AdvertiseHost)
 	}
 	loc := opts.PeerSet[idx]
 
@@ -260,7 +261,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	pvotes, err := ballot.votePropose(id, vid)
 
 	log.Printf("[DEBUG] Propose ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		entry.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
+		entry.LTime, hlog.conf.AdvertiseHost, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
 
 	if err != nil {
 		return ballot, err
@@ -275,7 +276,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 		}
 
 	} else if pvotes == hlog.conf.Votes {
-		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.Hostname, entry.Key)
+		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.AdvertiseHost, entry.Key)
 		// Start local commit phase.  We use our index as the voter
 		var cvotes int
 		cvotes, err = ballot.voteCommit(id, opts.PeerSet[idx].Host)
@@ -327,7 +328,7 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	vid := sloc.Host
 	votes, err := ballot.voteCommit(id, vid)
 	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		entry.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
+		entry.LTime, hlog.conf.AdvertiseHost, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
 	// We do not rollback here as we could have a faulty voter trying to commit
 	// without having a proposal.

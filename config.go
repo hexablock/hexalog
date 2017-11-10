@@ -10,7 +10,7 @@ import (
 
 // Config holds the configuration for the log.  This is used to initialize the log.
 type Config struct {
-	Hostname           string
+	AdvertiseHost      string
 	HealBufSize        int                    // Buffer size for heal requests
 	BroadcastBufSize   int                    // proposal and commit broadcast buffer
 	BallotReapInterval time.Duration          // interval at which old ballots are cleaned up
@@ -23,9 +23,9 @@ type Config struct {
 
 // DefaultConfig returns a sane set of default configurations.  The default hash function
 // used is SHA1
-func DefaultConfig(hostname string) *Config {
+func DefaultConfig(advHost string) *Config {
 	return &Config{
-		Hostname:           hostname,
+		AdvertiseHost:      advHost,
 		BroadcastBufSize:   32,
 		HealBufSize:        32,
 		BallotReapInterval: 30 * time.Second,

@@ -18,7 +18,7 @@ func (hlog *Hexalog) Leader(key []byte, locs []*Participant) (*KeyLeader, error)
 	for i := 0; i < l; i++ {
 
 		loc := locs[i]
-		if loc.Host == hlog.conf.Hostname {
+		if loc.Host == hlog.conf.AdvertiseHost {
 			lasts[i] = hlog.store.LastEntry(key)
 			continue
 		}

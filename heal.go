@@ -26,48 +26,13 @@ func (hlog *Hexalog) heal(key []byte, locs []*Participant) error {
 	lloc := leader.Location()
 
 	// We are the leader, so nothing to do
-	if lloc.Host == hlog.conf.Hostname {
+	if lloc.Host == hlog.conf.AdvertiseHost {
 		return nil
 	}
 
 	if err = hlog.checkLastEntryOrPull(lloc.Host, key, llh); err != nil {
 		return err
 	}
-
-	// // Get local keylog
-	// keylog, err := hlog.store.GetKey(key)
-	// if err != nil {
-	// 	// Create new key
-	// 	if err == hexatype.ErrKeyNotFound {
-	// 		if keylog, err = hlog.store.NewKey(key); err != nil {
-	// 			return err
-	// 		}
-	// 	} else {
-	// 		return err
-	// 	}
-	// }
-	// defer keylog.Close()
-	//
-	// var (
-	// 	h    = hlog.conf.Hasher()
-	// 	llh  = lle.Hash(h)
-	// 	slh  []byte
-	// 	last = keylog.LastEntry()
-	// )
-	//
-	// if last == nil {
-	// 	last = &Entry{Key: key, Height: 0}
-	// 	slh = make([]byte, h.Size())
-	// } else {
-	// 	h.Reset()
-	// 	slh = last.Hash(h)
-	// }
-	//
-	// // Fetch if there is a mismatch.
-	// if bytes.Compare(slh, llh) != 0 {
-	// 	_, er := hlog.trans.PullKeylog(lloc.Host, last, nil)
-	// 	return mergeErrors(err, er)
-	// }
 
 	//Check consistency
 	leader, er := hlog.Leader(key, locs)
