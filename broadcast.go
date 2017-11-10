@@ -5,7 +5,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -18,17 +17,17 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Partic
 	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.Hostname, host, o.SourceIndex)
 	resp, err := hlog.trans.ProposeEntry(ctx, host, entry, o)
 
-	switch err {
-
-	case hexatype.ErrPreviousHash:
-		hlog.hch <- &ReqResp{
-			Options: opts,
-			Entry:   entry,
-		}
-
-		log.Printf("[DEBUG] Healing from sending proposal key=%s height=%d", entry.Key, entry.Height)
-
-	}
+	// switch err {
+	//
+	// case hexatype.ErrPreviousHash:
+	// 	hlog.hch <- &ReqResp{
+	// 		Options: opts,
+	// 		Entry:   entry,
+	// 	}
+	//
+	// 	log.Printf("[DEBUG] Healing from sending proposal key=%s height=%d", entry.Key, entry.Height)
+	//
+	// }
 
 	return resp, err
 }
@@ -61,7 +60,6 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) ([]*Re
 			} else {
 				errCh <- err
 			}
-			//resp <- err
 		}(entry, p, idx, opts)
 
 	}
@@ -77,9 +75,7 @@ func (hlog *Hexalog) broadcastPropose(entry *Entry, opts *RequestOptions) ([]*Re
 		case resp := <-resp:
 			out = append(out, resp)
 		}
-		// if err := <-resp; err != nil {
-		// 	return err
-		// }
+
 	}
 
 	return out, nil
@@ -161,9 +157,11 @@ func (hlog *Hexalog) broadcastCommits() {
 		// Close the ballot with the given error
 		id := en.Hash(hlog.conf.Hasher())
 		hlog.ballotGetClose(id, err)
-		// Rollback the entry.
-		if er := hlog.store.RollbackEntry(en); er != nil {
-			log.Printf("[ERROR] Failed to rollback key=%s height=%d id=%x error='%v'", en.Key, en.Height, id, er)
+
+		// Rollback the entry. This may fail and should be harmless
+		if err = hlog.store.RollbackEntry(en); err != nil {
+			log.Printf("[WARN] Rollback failed: %v key=%s height=%d id=%x", err,
+				en.Key, en.Height, id)
 		}
 
 	}

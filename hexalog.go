@@ -108,7 +108,7 @@ func NewHexalog(conf *Config, appFSM FSM, entries EntryStore, index IndexStore, 
 	logstore := NewLogStore(entries, index, conf.Hasher)
 
 	// Init internal FSM that manages the user provided application fsm
-	ifsm, err := newFsm(appFSM, stableStore, logstore, conf.Hasher)
+	ifsm, err := newFsm(conf, appFSM, stableStore, logstore)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	if !ok {
 		// Create a new ballot and track it.
 		fentry := NewFutureEntry(id, entry)
-		ballot = newBallot(fentry, hlog.conf.Votes, hlog.conf.TTL)
+		ballot = newBallot(fentry, len(opts.PeerSet), hlog.conf.TTL)
 		hlog.ballots[key] = ballot
 		hlog.mu.Unlock()
 
@@ -260,7 +260,7 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	pvotes, err := ballot.votePropose(id, vid)
 
 	log.Printf("[DEBUG] Propose ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
+		entry.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
 
 	if err != nil {
 		return ballot, err
@@ -327,7 +327,7 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	vid := sloc.Host
 	votes, err := ballot.voteCommit(id, vid)
 	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		opts.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
+		entry.LTime, hlog.conf.Hostname, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
 
 	// We do not rollback here as we could have a faulty voter trying to commit
 	// without having a proposal.

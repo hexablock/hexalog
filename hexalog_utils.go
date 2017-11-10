@@ -149,10 +149,6 @@ func (hlog *Hexalog) reapBallotsOnce() (c int) {
 			continue
 		}
 
-		// props, commits := b.Proposals(), b.Commits()
-		// log.Printf("[DEBUG] Ballot reaped key=%s id=%x proposals=%d commits=%d error='%v'",
-		//	b.fentry.Entry.Key, k, props, commits, b.Error())
-
 		delete(hlog.ballots, k)
 		c++
 	}
@@ -186,9 +182,6 @@ func (hlog *Hexalog) checkOptions(opts *RequestOptions) error {
 		return hexatype.ErrInsufficientPeers
 	}
 
-	hlog.conf.LamportClock.Witness(hexatype.LamportTime(opts.LTime))
-	opts.LTime = uint64(hlog.conf.LamportClock.Time())
-
 	return nil
 }
 
@@ -216,7 +209,8 @@ func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte
 		hlog.cch <- &ReqResp{Entry: entry, Options: opts}
 		hlog.conf.LamportClock.Increment()
 
-	} else if currVotes == hlog.conf.Votes {
+	} else if currVotes == len(opts.PeerSet) {
+		//else if currVotes == hlog.conf.Votes {
 
 		if err := hlog.store.AppendEntry(entry); err != nil {
 			ballot.close(err)

@@ -13,7 +13,6 @@ func (o *RequestOptions) CloneWithSourceIndex(idx int32) *RequestOptions {
 	opts := &RequestOptions{
 		SourceIndex: idx,
 		PeerSet:     make([]*Participant, len(o.PeerSet)),
-		LTime:       o.LTime,
 	}
 	copy(opts.PeerSet, o.PeerSet)
 

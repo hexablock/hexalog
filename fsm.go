@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"hash"
 
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -50,17 +51,20 @@ type fsm struct {
 	ls *LogStore
 	// hash function to use
 	hasher func() hash.Hash
+	// lamport clock
+	ltime *hexatype.LamportClock
 }
 
 // newFsm initializes a new fsm with the given application FSM, stable store and hash
 // function.  It opens the store and starts the applying in a separate go routine.
-func newFsm(f FSM, ss StableStore, logstore *LogStore, hasher func() hash.Hash) (*fsm, error) {
+func newFsm(conf *Config, f FSM, ss StableStore, logstore *LogStore) (*fsm, error) {
 	fsm := &fsm{
 		f:       f,
 		applyCh: make(chan *FutureEntry, 16),
 		ss:      ss,
 		ls:      logstore,
-		hasher:  hasher,
+		hasher:  conf.Hasher,
+		ltime:   conf.LamportClock,
 	}
 
 	if err := ss.Open(); err != nil {
@@ -98,6 +102,9 @@ func (fsm *fsm) start() {
 				data = resp
 			}
 		}
+		// Update clock with the entry ltime
+		fsm.ltime.Witness(hexatype.LamportTime(entry.LTime))
+
 		// Commit the last fsm applied entry to stable store
 		e2 := fsm.ss.Set(entry.Key, fentry.ID())
 
@@ -105,8 +112,8 @@ func (fsm *fsm) start() {
 		// and/or error
 		fentry.applied(data, mergeErrors(e1, e2))
 
-		//log.Printf("[INFO] Applied key=%s height=%d runtime=%v error='%v'",
-		// entry.Key, entry.Height, fentry.Runtime(), e)
+		log.Printf("[DEBUG] FSM applied ltime=%d key=%s height=%d runtime=%v",
+			entry.LTime, entry.Key, entry.Height, fentry.Runtime())
 	}
 
 }
