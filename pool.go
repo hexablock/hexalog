@@ -40,11 +40,10 @@ func (pool *outPool) returnConn(o *rpcOutConn) {
 		return
 	}
 
-	// Update the last used time
-	o.used = time.Now()
-
 	// Push back into the pool
 	pool.mu.Lock()
+	// Update the last used time
+	o.used = time.Now()
 	pool.pool[o.host] = o
 	pool.mu.Unlock()
 }

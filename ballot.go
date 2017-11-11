@@ -173,11 +173,13 @@ func (b *Ballot) close(err error) error {
 		return errBallotAlreadyClosed
 	}
 
-	b.completed = time.Now()
-
 	b.timer.Stop()
 	atomic.StoreInt32(&b.closed, 1)
+
+	b.cmu.Lock()
+	b.completed = time.Now()
 	b.e = err
+	b.cmu.Unlock()
 
 	switch err {
 	case nil:

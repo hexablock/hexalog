@@ -111,9 +111,6 @@ func (fsm *fsm) start() {
 		// Signal the future that we have applied the passing the user fsm response
 		// and/or error
 		fentry.applied(data, mergeErrors(e1, e2))
-
-		log.Printf("[DEBUG] FSM applied ltime=%d key=%s height=%d runtime=%v",
-			entry.LTime, entry.Key, entry.Height, fentry.Runtime())
 	}
 
 }
