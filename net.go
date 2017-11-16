@@ -11,6 +11,7 @@ import (
 	"github.com/hexablock/log"
 )
 
+// KeySeedStream is used to stream seed keys
 type KeySeedStream struct {
 	o    *rpcOutConn
 	pool *outPool

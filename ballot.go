@@ -26,31 +26,39 @@ type Ballot struct {
 	// Future for the Entry being voted on.  This is used to know and wait on when an actual
 	// entry is applied to the application defined FSM
 	fentry *FutureEntry
+
 	// Time voting first began on the ballot
 	dispatched time.Time
 	// Time ballot was closed
 	completed time.Time
+
 	// TTL for the ballot. The ballot is closed once the ttl has been reached
 	ttl time.Duration
 	// TTL timer
 	timer *time.Timer
+
 	// Map to count proposed votes
 	pmu      sync.RWMutex
-	proposed map[string]struct{}
+	proposed []string
+
 	// Map to count committed votes
 	cmu       sync.RWMutex
-	committed map[string]struct{}
+	committed []string
+
 	// Votes required for both proposed and committed
 	votes int
+
 	// Error channel used to wait for completion
-	err chan error
-	// Done channel used to wait for completion
-	done chan struct{}
-	// This is set once the ballot has been closed to stop further processing/
-	closed int32
+	errc chan error
 	// Error the ballot was closed with.  This is the same error that would be in the error
 	// channel
-	e error
+	err error
+
+	// Done channel used to wait for completion
+	done chan struct{}
+
+	// This is set once the ballot has been closed to stop further processing/
+	closed int32
 }
 
 func newBallot(fentry *FutureEntry, requiredVotes int, ttl time.Duration) *Ballot {
@@ -58,9 +66,9 @@ func newBallot(fentry *FutureEntry, requiredVotes int, ttl time.Duration) *Ballo
 		fentry:    fentry,
 		ttl:       ttl,
 		votes:     requiredVotes,
-		proposed:  make(map[string]struct{}),
-		committed: make(map[string]struct{}),
-		err:       make(chan error, requiredVotes),
+		proposed:  make([]string, requiredVotes),
+		committed: make([]string, requiredVotes),
+		errc:      make(chan error, requiredVotes),
 		done:      make(chan struct{}, requiredVotes),
 	}
 }
@@ -71,7 +79,7 @@ func (b *Ballot) Wait() error {
 
 	select {
 	case <-b.done:
-	case err = <-b.err:
+	case err = <-b.errc:
 	}
 
 	return err
@@ -88,7 +96,7 @@ func (b *Ballot) Commits() int {
 	b.cmu.RLock()
 	defer b.cmu.RUnlock()
 
-	return len(b.committed)
+	return countVotes(b.committed)
 }
 
 // Proposals safely returns the number of current proposals
@@ -96,28 +104,38 @@ func (b *Ballot) Proposals() int {
 	b.pmu.RLock()
 	defer b.pmu.RUnlock()
 
-	return len(b.proposed)
+	//return len(b.proposed)
+	return countVotes(b.proposed)
 }
 
 // votePropose submit a vote for the propose phase.  It takes an Entry hash id and a voter
 // as parameters.  If the voter has already voted it simply returns the proposed votes
 // with no error.  An error is returned if the supplied id does not match the the entry id
 // of the ballot.
-func (b *Ballot) votePropose(id []byte, voter string) (int, error) {
-	if atomic.LoadInt32(&b.closed) == 1 {
-		return -1, errBallotClosed
+func (b *Ballot) votePropose(entryID []byte, voter string, voterIdx int) (int, bool, error) {
+	// Check the entry id to make sure it matches the ballot.
+	if bytes.Compare(b.fentry.ID(), entryID) != 0 {
+		return -1, false, errInvalidVoteID
 	}
 
-	// Check the entry id to make sure it matches the ballot.
-	if bytes.Compare(b.fentry.ID(), id) != 0 {
-		return -1, errInvalidVoteID
+	if atomic.LoadInt32(&b.closed) == 1 {
+		if b.err == nil {
+			return -1, false, errBallotClosed
+		}
+		return -1, false, b.err
 	}
 
 	b.pmu.Lock()
 	defer b.pmu.Unlock()
 
-	b.proposed[voter] = struct{}{}
-	proposals := len(b.proposed)
+	if b.proposed[voterIdx] == "" {
+		b.proposed[voterIdx] = voter
+	} else {
+		log.Println("[WARN] Already voted for propose:", voter)
+		return countVotes(b.proposed), false, nil
+	}
+
+	proposals := countVotes(b.proposed)
 
 	// Initiaze timer if this is the first proposal for ballot.  Do not set ttl if it is
 	// the same voter,trying to vote again.
@@ -126,39 +144,54 @@ func (b *Ballot) votePropose(id []byte, voter string) (int, error) {
 		b.setTTL()
 	}
 
-	return proposals, nil
+	return proposals, true, nil
+}
+
+func (b *Ballot) haveProposal(voter string) bool {
+	for _, s := range b.proposed {
+		if s == voter {
+			return true
+		}
+	}
+	return false
 }
 
 // voteCommit submits a commit vote.  If the voter has already voted it simply
 // returns the committed votes with no error
-func (b *Ballot) voteCommit(id []byte, voter string) (int, error) {
-	// We dont check ballot close here as you may have stragglers.
-
-	// if atomic.LoadInt32(&b.closed) == 1 {
-	// 	return -1, errBallotClosed
-	// }
-
+func (b *Ballot) voteCommit(entryID []byte, voter string, voterIdx int) (int, bool, error) {
 	// Check the entry id to make sure it matches the ballot.
-	if bytes.Compare(b.fentry.ID(), id) != 0 {
-		return -1, errInvalidVoteID
+	if bytes.Compare(b.fentry.ID(), entryID) != 0 {
+		return -1, false, errInvalidVoteID
+	}
+
+	if atomic.LoadInt32(&b.closed) == 1 {
+		if b.err == nil {
+			return -1, false, errBallotClosed
+		}
+		return -1, false, b.err
 	}
 
 	// Add commit vote
 	b.cmu.Lock()
 	defer b.cmu.Unlock()
 
-	b.committed[voter] = struct{}{}
-	return len(b.committed), nil
+	if b.committed[voterIdx] == "" {
+		b.committed[voterIdx] = voter
+	} else {
+		log.Println("[DEBUG] Already voted for commit:", voter)
+		return countVotes(b.committed), false, nil
+	}
 
+	return countVotes(b.committed), true, nil
 }
 
 // setTTL starts the counter to appropriately expire the ballot
 func (b *Ballot) setTTL() {
-	log.Printf("[DEBUG] Ballot opened %p", b)
+	log.Printf("[DEBUG] Ballot opened key=%s ballot=%p required-votes=%d", b.fentry.Entry.Key, b, b.votes)
 	// Setup ballot expiration
 	b.timer = time.AfterFunc(b.ttl, func() {
 		atomic.StoreInt32(&b.closed, 1)
-		b.err <- errBallotTimedOut
+		b.errc <- errBallotTimedOut
 	})
 }
 
@@ -169,8 +202,8 @@ func (b *Ballot) Closed() bool {
 
 // close the ballot stopping the timer and writing err to the done chan.
 func (b *Ballot) close(err error) error {
-	if b.Closed() {
-		return errBallotAlreadyClosed
+	if atomic.LoadInt32(&b.closed) == 1 {
+		return b.err
 	}
 
 	b.timer.Stop()
@@ -178,14 +211,14 @@ func (b *Ballot) close(err error) error {
 
 	b.cmu.Lock()
 	b.completed = time.Now()
-	b.e = err
+	b.err = err
 	b.cmu.Unlock()
 
 	switch err {
 	case nil:
 		b.done <- struct{}{}
 	default:
-		b.err <- err
+		b.errc <- err
 	}
 
 	log.Printf("[INFO] Ballot closed key=%s height=%d ballot=%p runtime=%v error='%v'",
@@ -195,10 +228,20 @@ func (b *Ballot) close(err error) error {
 
 // Error returns the error the ballot was closed with if any
 func (b *Ballot) Error() error {
-	return b.e
+	return b.err
 }
 
 // Runtime returns the amount of time taken for this ballot to complete
 func (b *Ballot) Runtime() time.Duration {
 	return b.completed.Sub(b.dispatched)
+}
+
+func countVotes(arr []string) int {
+	var c int
+	for _, v := range arr {
+		if v != "" {
+			c++
+		}
+	}
+	return c
 }

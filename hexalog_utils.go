@@ -202,32 +202,47 @@ func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
 	}
 }
 
-// checkVoteAct checks the number of commits and takes the appropriate action
-func (hlog *Hexalog) checkCommitAndAct(currVotes int, ballot *Ballot, key []byte, entry *Entry, opts *RequestOptions) {
+// broadcastOrCommit checks the number of commits and takes the appropriate action
+func (hlog *Hexalog) queueBroadcastOrCommit(currVotes int, ballot *Ballot, opts *RequestOptions) {
 	if currVotes == 1 {
 		// Broadcast commit entry
+		entry := ballot.fentry.Entry
+
+		log.Printf("[DEBUG] Commit broadcast key=%s netsize=%d", string(entry.Key), len(opts.PeerSet))
+
 		hlog.cch <- &ReqResp{Entry: entry, Options: opts}
 		hlog.conf.LamportClock.Increment()
 
 	} else if currVotes == len(opts.PeerSet) {
-		//else if currVotes == hlog.conf.Votes {
-
-		if err := hlog.store.AppendEntry(entry); err != nil {
-			ballot.close(err)
-			return
-		}
-
-		log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.AdvertiseHost, entry.Key, entry.Height)
-		// Queue future entry to be applied to the FSM.
-		hlog.fsm.apply(ballot.fentry)
-		// Close the ballot after we've submitted to the fsm
-		ballot.close(nil)
-		// Ballot is closed.  Remove ballot and stop tracking
-		//hlog.removeBallot(key)
-		hlog.conf.LamportClock.Increment()
+		hlog.checkVotesAndCommit(ballot)
 	}
 
 	// Do nothing as it may be a repetative vote
+}
+
+func (hlog *Hexalog) checkVotesAndCommit(ballot *Ballot) bool {
+
+	if ballot.Proposals() != ballot.Commits() {
+		log.Println("[DEBUG] Waiting on proposals and commits...")
+		return false
+	}
+
+	entry := ballot.fentry.Entry
+	if err := hlog.store.AppendEntry(entry); err != nil {
+		ballot.close(err)
+		return false
+	}
+
+	log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.AdvertiseHost, entry.Key, entry.Height)
+	// Queue future entry to be applied to the FSM.
+	hlog.fsm.apply(ballot.fentry)
+	// Close the ballot after we've submitted to the fsm
+	ballot.close(nil)
+	// Ballot is closed.  Remove ballot and stop tracking
+	//hlog.removeBallot(key)
+	hlog.conf.LamportClock.Increment()
+
+	return true
 }
 
 func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts *RequestOptions) error {
@@ -243,6 +258,7 @@ func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts
 
 	}
 
+	log.Println("PROPOSE BROADCASTED", string(entry.Key))
 	// Broadcast proposal
 	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 	hlog.conf.LamportClock.Increment()

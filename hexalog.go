@@ -227,28 +227,34 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 
 	key := string(id)
 
+	peerSetSize := len(opts.PeerSet)
+
 	// Get or create ballot as necessary
 	hlog.mu.Lock()
 	ballot, ok := hlog.ballots[key]
 	if !ok {
 		// Create a new ballot and track it.
 		fentry := NewFutureEntry(id, entry)
-		ballot = newBallot(fentry, len(opts.PeerSet), hlog.conf.TTL)
+		ballot = newBallot(fentry, peerSetSize, hlog.conf.TTL)
 		hlog.ballots[key] = ballot
 		hlog.mu.Unlock()
 
 		// Cast a vote for ourself if we are not the SourceIndex, on top of
 		// casting the remote vote taking place below
 		if idx != int(opts.SourceIndex) {
-			if _, err = ballot.votePropose(id, loc.Host); err != nil {
-				return nil, err
+			_, voted, er := ballot.votePropose(id, loc.Host, idx)
+			if err != nil {
+				return nil, er
 			}
 
-			// Create a new key if height is zero. We ignore the error as it may
-			// already have been created
-			if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, opts); err != nil {
-				ballot.close(err)
-				return nil, err
+			if voted {
+				// Create a new key if height is zero. We ignore the error as it may
+				// already have been created
+				copts := opts.CloneWithSourceIndex(int32(idx))
+				if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, copts); err != nil {
+					ballot.close(err)
+					return nil, err
+				}
 			}
 
 		}
@@ -258,9 +264,9 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	}
 
 	vid := opts.SourcePeer().Host
-	pvotes, err := ballot.votePropose(id, vid)
+	pvotes, voted, err := ballot.votePropose(id, vid, int(opts.SourceIndex))
 
-	log.Printf("[DEBUG] Propose ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
+	log.Printf("[DEBUG] Propose ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%s error='%v'",
 		entry.LTime, hlog.conf.AdvertiseHost, entry.Key, opts.SourceIndex, ballot, pvotes, vid, err)
 
 	if err != nil {
@@ -268,35 +274,18 @@ func (hlog *Hexalog) Propose(entry *Entry, opts *RequestOptions) (*Ballot, error
 	}
 
 	if pvotes == 1 {
-		// Create a new key if height is 0 and we don't have the key.  We ignore
-		// the error as it may already have been created.
-		if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, opts); err != nil {
-			ballot.close(err)
-			return nil, err
-		}
-
-	} else if pvotes == hlog.conf.Votes {
-		log.Printf("[DEBUG] Proposal accepted host=%s key=%s", hlog.conf.AdvertiseHost, entry.Key)
-		// Start local commit phase.  We use our index as the voter
-		var cvotes int
-		cvotes, err = ballot.voteCommit(id, opts.PeerSet[idx].Host)
-		if err == nil {
-			// Take action if we have the required commits by appending the log
-			// entry and calling app fsm.Apply
-			hlog.checkCommitAndAct(cvotes, ballot, id, entry, opts)
-
-		} else {
-
-			// We rollback here as we appended but the vote failed
-			log.Printf("[INFO] Rolling back key=%s height=%d id=%x",
-				entry.Key, entry.Height, id)
-			if er := hlog.store.RollbackEntry(entry); er != nil {
-				log.Printf("[ERROR] Rollback failed key=%s height=%d error='%v'",
-					entry.Key, entry.Height, er)
+		if voted { // Create a new key if height is 0 and we don't have the key.  We ignore
+			// the error as it may already have been created.
+			copts := opts.CloneWithSourceIndex(int32(idx))
+			if err = hlog.upsertKeyAndBroadcast(prevHeight, entry, copts); err != nil {
+				ballot.close(err)
+				return nil, err
 			}
-
 		}
 
+	} else if pvotes == peerSetSize {
+		// check if we can commit
+		hlog.checkVotesAndCommit(ballot)
 	}
 
 	return ballot, err
@@ -307,6 +296,14 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 	// Check request options
 	if err := hlog.checkOptions(opts); err != nil {
 		return nil, err
+	}
+
+	//fmt.Printf("%s COMMIT index=%d voter=%s\n", hlog.conf.AdvertiseHost, opts.SourceIndex, opts.SourcePeer().Host)
+
+	// Get our location index in the peerset and location
+	selfIndex, ok := hlog.getSelfIndex(opts.PeerSet)
+	if !ok {
+		return nil, fmt.Errorf("%s not in peer set", hlog.conf.AdvertiseHost)
 	}
 
 	//
@@ -320,15 +317,28 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 		return nil, errBallotNotFound
 	}
 
+	if int32(selfIndex) != opts.SourceIndex {
+		votes, voted, err := ballot.voteCommit(id, opts.PeerSet[selfIndex].Host, selfIndex)
+		if err != nil {
+			return ballot, err
+		}
+
+		if voted {
+			copts := opts.CloneWithSourceIndex(int32(selfIndex))
+			hlog.queueBroadcastOrCommit(votes, ballot, copts)
+		}
+	}
+
 	//
 	// TODO: Verify & Validate
 	//
 
 	sloc := opts.SourcePeer()
-	vid := sloc.Host
-	votes, err := ballot.voteCommit(id, vid)
-	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%x error='%v'",
-		entry.LTime, hlog.conf.AdvertiseHost, entry.Key, opts.SourceIndex, ballot, votes, vid, err)
+	voter := sloc.Host
+	votes, voted, err := ballot.voteCommit(id, voter, int(opts.SourceIndex))
+
+	log.Printf("[DEBUG] Commit ltime=%d host=%s key=%s index=%d ballot=%p votes=%d voter=%s error='%v'",
+		entry.LTime, hlog.conf.AdvertiseHost, entry.Key, opts.SourceIndex, ballot, votes, voter, err)
 
 	// We do not rollback here as we could have a faulty voter trying to commit
 	// without having a proposal.
@@ -336,7 +346,10 @@ func (hlog *Hexalog) Commit(entry *Entry, opts *RequestOptions) (*Ballot, error)
 		return ballot, err
 	}
 
-	hlog.checkCommitAndAct(votes, ballot, id, entry, opts)
+	if voted {
+		copts := opts.CloneWithSourceIndex(int32(selfIndex))
+		hlog.queueBroadcastOrCommit(votes, ballot, copts)
+	}
 
 	return ballot, nil
 }

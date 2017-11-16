@@ -1,6 +1,8 @@
 package hexalog
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -101,6 +103,7 @@ func (server *testServer) stop() {
 
 func initConf(addr string) *Config {
 	conf := DefaultConfig(addr)
+	conf.Hasher = sha256.New
 	conf.BallotReapInterval = 5 * time.Second
 	return conf
 }
@@ -161,6 +164,7 @@ func TestHexalog(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-time.After(1 * time.Second)
+	fmt.Println("Cluster started!")
 
 	testkey := []byte("hexalog-key")
 	testdata := []byte("hexalog-data")
@@ -172,6 +176,11 @@ func TestHexalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// <-time.After(20 * time.Millisecond)
+	// if _, err = ts2.hlog.Commit(ent1, testOpts2); err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	if err = ballot.Wait(); err != nil {
 		t.Fatal(err)

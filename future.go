@@ -16,15 +16,20 @@ var (
 type FutureEntry struct {
 	// This is the hash id of the entry that is supplied upon instantiation
 	id []byte
+
 	// Entry to be applied
 	Entry *Entry
+
 	// Channel used to signal applying entry failed
 	err chan error
+
 	// Channel used to signal entry was applied.  It contains the data from that returned
 	// from the application fsm i.e. data returned from FSM.Apply
 	done chan interface{}
+
 	// Time the entry was set to be applied to the fsm.
 	dispatched time.Time
+
 	// Time the entry was applied to the fsm.  This is set when a call to applied is made.
 	completed time.Time
 }

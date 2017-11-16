@@ -14,7 +14,9 @@ func (hlog *Hexalog) sendProposal(ctx context.Context, entry *Entry, loc *Partic
 	host := loc.Host
 	o := opts.CloneWithSourceIndex(int32(idx))
 
-	log.Printf("[DEBUG] Broadcast phase=propose %s -> %s index=%d", hlog.conf.AdvertiseHost, host, o.SourceIndex)
+	log.Printf("[DEBUG] Propose broadcast key=%s %s -> %s index=%d",
+		entry.Key, hlog.conf.AdvertiseHost, host, o.SourceIndex)
+
 	resp, err := hlog.trans.ProposeEntry(ctx, host, entry, o)
 
 	// switch err {
@@ -87,11 +89,17 @@ func (hlog *Hexalog) broadcastProposals() {
 
 	for msg := range hlog.pch {
 
-		if _, err := hlog.broadcastPropose(msg.Entry, msg.Options); err != nil {
-
+		_, err := hlog.broadcastPropose(msg.Entry, msg.Options)
+		if err != nil {
 			id := msg.Entry.Hash(hlog.conf.Hasher())
 			hlog.ballotGetClose(id, err)
+			continue
+		}
 
+		// Commit once the proposal is accepted by all participants
+		if _, err = hlog.Commit(msg.Entry, msg.Options); err != nil {
+			id := msg.Entry.Hash(hlog.conf.Hasher())
+			hlog.ballotGetClose(id, err)
 		}
 
 	}
@@ -120,11 +128,16 @@ func (hlog *Hexalog) broadcastCommit(entry *Entry, opts *RequestOptions) error {
 		}
 
 		go func(ent *Entry, loc *Participant, i int, opt *RequestOptions) {
+
 			o := opt.CloneWithSourceIndex(int32(i))
 			host := loc.Host
 
-			log.Printf("[DEBUG] Broadcast phase=commit %s -> %s index=%d", hlog.conf.AdvertiseHost, host, o.SourceIndex)
-			resp <- hlog.trans.CommitEntry(ctx, host, ent, o)
+			err := hlog.trans.CommitEntry(ctx, host, ent, o)
+
+			log.Printf("[DEBUG] Commit broadcast key=%s %s -> %s index=%d error='%v'",
+				ent.Key, hlog.conf.AdvertiseHost, host, o.SourceIndex, err)
+
+			resp <- err
 
 		}(entry, p, idx, opts)
 
@@ -159,10 +172,10 @@ func (hlog *Hexalog) broadcastCommits() {
 		hlog.ballotGetClose(id, err)
 
 		// Rollback the entry. This may fail and should be harmless
-		if err = hlog.store.RollbackEntry(en); err != nil {
-			log.Printf("[WARN] Rollback failed: %v key=%s height=%d id=%x", err,
-				en.Key, en.Height, id)
-		}
+		// if err = hlog.store.RollbackEntry(en); err != nil {
+		// 	log.Printf("[WARN] Rollback failed: %v key=%s height=%d id=%x", err,
+		// 		en.Key, en.Height, id)
+		// }
 
 	}
 
