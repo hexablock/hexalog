@@ -202,6 +202,27 @@ func (hlog *Hexalog) ballotGetClose(key []byte, err error) {
 	}
 }
 
+func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts *RequestOptions) error {
+	if prevHeight == 0 {
+
+		kli, err := hlog.store.NewKey(entry.Key)
+		if err == nil {
+			kli.Close()
+		} else if err != hexatype.ErrKeyExists {
+			// Ignore key exists error
+			return err
+		}
+
+	}
+
+	log.Println("PROPOSE BROADCASTED", string(entry.Key))
+	// Broadcast proposal
+	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
+	hlog.conf.LamportClock.Increment()
+
+	return nil
+}
+
 // broadcastOrCommit checks the number of commits and takes the appropriate action
 func (hlog *Hexalog) queueBroadcastOrCommit(currVotes int, ballot *Ballot, opts *RequestOptions) {
 	if currVotes == 1 {
@@ -243,27 +264,6 @@ func (hlog *Hexalog) checkVotesAndCommit(ballot *Ballot) bool {
 	hlog.conf.LamportClock.Increment()
 
 	return true
-}
-
-func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts *RequestOptions) error {
-	if prevHeight == 0 {
-
-		kli, err := hlog.store.NewKey(entry.Key)
-		if err == nil {
-			kli.Close()
-		} else if err != hexatype.ErrKeyExists {
-			// Ignore key exists error
-			return err
-		}
-
-	}
-
-	log.Println("PROPOSE BROADCASTED", string(entry.Key))
-	// Broadcast proposal
-	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-	hlog.conf.LamportClock.Increment()
-
-	return nil
 }
 
 func mergeErrors(e1, e2 error) (err error) {

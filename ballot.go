@@ -131,7 +131,7 @@ func (b *Ballot) votePropose(entryID []byte, voter string, voterIdx int) (int, b
 	if b.proposed[voterIdx] == "" {
 		b.proposed[voterIdx] = voter
 	} else {
-		log.Println("[WARN] Already voted for propose:", voter)
+		//log.Println("[DEBUG] Already voted for propose:", voter)
 		return countVotes(b.proposed), false, nil
 	}
 
@@ -178,7 +178,7 @@ func (b *Ballot) voteCommit(entryID []byte, voter string, voterIdx int) (int, bo
 	if b.committed[voterIdx] == "" {
 		b.committed[voterIdx] = voter
 	} else {
-		log.Println("[DEBUG] Already voted for commit:", voter)
+		//log.Println("[DEBUG] Already voted for commit:", voter)
 		return countVotes(b.committed), false, nil
 	}
 
