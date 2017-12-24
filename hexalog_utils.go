@@ -215,8 +215,8 @@ func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts
 
 	}
 
-	log.Println("PROPOSE BROADCASTED", string(entry.Key))
 	// Broadcast proposal
+	//log.Printf("PROPOSE BROADCASTED key=%s id=%x", string(entry.Key), entry.Previous)
 	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
 	hlog.conf.LamportClock.Increment()
 
