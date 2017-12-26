@@ -208,6 +208,11 @@ func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts
 		kli, err := hlog.store.NewKey(entry.Key)
 		if err == nil {
 			kli.Close()
+
+			// Only update if we created a key
+			//hlog.conf.LamportClock.Increment()
+			//hlog.conf.LamportClock.Witness(hexatype.LamportTime(entry.LTime))
+
 		} else if err != hexatype.ErrKeyExists {
 			// Ignore key exists error
 			return err
@@ -218,7 +223,6 @@ func (hlog *Hexalog) upsertKeyAndBroadcast(prevHeight uint32, entry *Entry, opts
 	// Broadcast proposal
 	//log.Printf("PROPOSE BROADCASTED key=%s id=%x", string(entry.Key), entry.Previous)
 	hlog.pch <- &ReqResp{Entry: entry, Options: opts}
-	hlog.conf.LamportClock.Increment()
 
 	return nil
 }
@@ -232,7 +236,7 @@ func (hlog *Hexalog) queueBroadcastOrCommit(currVotes int, ballot *Ballot, opts 
 		log.Printf("[DEBUG] Commit broadcast key=%s netsize=%d", string(entry.Key), len(opts.PeerSet))
 
 		hlog.cch <- &ReqResp{Entry: entry, Options: opts}
-		hlog.conf.LamportClock.Increment()
+		//hlog.conf.LamportClock.Increment()
 
 	} else if currVotes == len(opts.PeerSet) {
 		hlog.checkVotesAndCommit(ballot)
@@ -254,14 +258,17 @@ func (hlog *Hexalog) checkVotesAndCommit(ballot *Ballot) bool {
 		return false
 	}
 
-	log.Printf("[DEBUG] Commit accepted host=%s key=%s height=%d ", hlog.conf.AdvertiseHost, entry.Key, entry.Height)
+	//	hlog.conf.LamportClock.Increment()
+	hlog.conf.LamportClock.Witness(hexatype.LamportTime(entry.LTime))
+
+	log.Printf("[DEBUG] Entry committed ltime=%d host=%s key=%s height=%d ",
+		entry.LTime, hlog.conf.AdvertiseHost, entry.Key, entry.Height)
 	// Queue future entry to be applied to the FSM.
 	hlog.fsm.apply(ballot.fentry)
 	// Close the ballot after we've submitted to the fsm
 	ballot.close(nil)
 	// Ballot is closed.  Remove ballot and stop tracking
 	//hlog.removeBallot(key)
-	hlog.conf.LamportClock.Increment()
 
 	return true
 }
