@@ -5,13 +5,13 @@
   branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
-  revision = "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+  revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/hexatype"
   packages = ["."]
-  revision = "d763b100c44bedd66d05b8b564b27fec84a1f949"
+  revision = "d3c77fbcee4535364d1a93b69c4a208c2b593f69"
 
 [[projects]]
   branch = "master"
@@ -21,37 +21,37 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/minio/blake2b-simd"
+  name = "github.com/hexablock/vivaldi"
   packages = ["."]
-  revision = "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4"
+  revision = "155e2137d7336f6641f625d09fa032e4badbc19e"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "4b14673ba32bee7f5ac0f990a48f033919fd418b"
+  revision = "d866cfc389cec985d6fda2859936a575a55a3ab6"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "6eab0e8f74e86c598ec3b6fad4888e0c11482d48"
+  revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "f676e0f3ac6395ff1a529ae59a6670878a8371a6"
+  revision = "a8101f21cf983e773d0c1133ebc5424792003214"
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","balancer","codes","connectivity","credentials","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","stats","status","tap","transport"]
-  revision = "61d37c5d657a47e4404fd6823bd598341a2595de"
-  version = "v1.7.1"
+  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/passthrough","stats","status","tap","transport"]
+  revision = "e687fa4e6424368ece6e4fe727cea2c806a0fcb4"
+  version = "v1.8.2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "caf23e7ab73902bf2aec96500b600abec0b6b3bbf892cffbd005ca67be9f28f2"
+  inputs-digest = "188d6b71bdf72a6098821f73ebc4613d95b043233a9470ada04fdd8e9fbd4cfc"
   solver-name = "gps-cdcl"
   solver-version = 1
